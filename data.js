@@ -47,7 +47,11 @@
     return !where || Object.keys(where).every(function (k) { return doc[k] === where[k]; });
   }
   function sampleData() { return window.SAMPLE_DATA ? window.SAMPLE_DATA() : { config: {} }; }
-  function lessonOnly() { return { config: sampleData().config }; }
+  function lessonOnly() {   // 실제 반: 수업 설정만, T단계만 열린 상태로 시작
+    var config = sampleData().config;
+    config.lesson.open = { T: true, H: false, I: false, N: false, K: false };
+    return { config: config };
+  }
   function initialData(c) { return c === TEST_CLASS ? sampleData() : lessonOnly(); }
   function emitter() {
     var ls = [];
