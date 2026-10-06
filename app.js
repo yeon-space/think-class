@@ -1571,6 +1571,15 @@
   function init() {
     try { S.user = JSON.parse(sessionStorage.getItem('think-user') || 'null'); } catch (e) { S.user = null; }
 
+    // 15초가 지나도 못 불러오면 "불러오는 중…"에서 멈추지 않게 안내
+    setTimeout(function () {
+      if (S.d) return;
+      document.getElementById('app').innerHTML =
+        '<div class="locked-view"><div class="ic">📶</div><h2>연결이 늦어지고 있어요</h2>' +
+        '<p>인터넷(와이파이) 연결을 확인한 뒤 새로고침해 주세요.</p>' +
+        '<button class="btn primary" onclick="location.reload()">새로고침</button></div>';
+    }, 15000);
+
     DataStore.onError(function (code) { S.netError = netMessage(code); renderSync(); toast('⚠️ ' + S.netError); });
     DataStore.onSync(function (n) {
       S.syncing = n;

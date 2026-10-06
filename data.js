@@ -26,7 +26,7 @@
  * 비용(읽기 횟수)을 줄이는 방법
  *   - 반마다 데이터를 나눕니다.
  *   - 학생은 "자기 모둠" 데이터만 실시간으로 받습니다. 교사는 반 전체를 받습니다.
- *   - 한 번 받은 데이터는 기기에 저장해 두고(오프라인 캐시), 바뀐 것만 새로 받습니다.
+ *   - 화면을 열어 둔 동안에는 바뀐 것만 새로 받습니다. (새로고침하면 처음부터 다시 받음)
  *   - 접속 표시는 4분에 한 번만 신호를 보냅니다.
  * ===================================================================== */
 (function () {
@@ -205,10 +205,8 @@
       .then(function () {
         if (!firebase.apps.length) firebase.initializeApp(cfg);
         db = firebase.firestore();
-        // 한 번 받은 데이터를 기기에 저장 → 새로고침해도 바뀐 것만 다시 받음
-        return db.enablePersistence({ synchronizeTabs: true }).catch(function (e) {
-          console.warn('오프라인 캐시를 켜지 못했어요:', e && e.code);
-        });
+        // 기기 저장소(IndexedDB) 캐시는 쓰지 않음: 연결이 끊겼다 돌아올 때 캐시가 잠겨
+        // "불러오는 중…"에서 멈추는 일이 있어서, 항상 서버에서 새로 받는 방식이 더 안전함
       })
       .then(function () { return db; })
       .catch(function (e) { report(e); throw e; });
