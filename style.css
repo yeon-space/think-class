@@ -462,3 +462,28 @@ table.data tr.grp td { background: #FBF8F3; font-weight: 800; color: var(--muted
 .modal-btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; flex-wrap: wrap; }
 .modal-btns .btn { min-width: 110px; }
 .btn.danger-solid { background: var(--exc); border-color: var(--exc); color: #fff; }
+
+/* ---------- 참여 확인 (한 명당 1개 이상) ---------- */
+.particip { background: #fff; border: 2px dashed var(--c); border-radius: 14px; padding: 12px 16px; margin: 0 0 16px; }
+.particip-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.particip .todo { font-weight: 800; color: #9A4521; background: #FFF1D6; border-radius: 10px; padding: 4px 12px; }
+.particip .todo.ok { color: #23713F; background: #E3F4E8; }
+.particip .pcount { margin-left: auto; font-weight: 800; color: var(--c); }
+.pchips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.pc { background: var(--soft); color: var(--muted); border-radius: 99px; padding: 3px 12px; font-size: .9rem; font-weight: 700; }
+.pc.ok { background: var(--cs); color: var(--ink); }
+.mytag { display: inline-block; margin-left: 8px; font-size: .8rem; font-weight: 800; color: #9A4521; background: #FFF1D6; border-radius: 8px; padding: 1px 8px; vertical-align: middle; }
+.qlist li.mine { border-color: var(--h); background: #FFFBEF; }
+
+/* H 질문 리스트 결과 상자 (진한 노랑) */
+.card.result.ph-H { box-shadow: 0 6px 18px rgba(210, 149, 26, .18); }
+.card.result.ph-H .ribbon { background: var(--h); }
+.card.result.ph-H .qlist li { background: #fff; }
+.card.result.ph-H input { background: #fff; border-color: #EBCF8C; }
+
+/* H 댓글 2개 제한 */
+.clock { background: var(--soft); border-radius: 12px; padding: 12px 14px; font-weight: 700; color: var(--muted); }
+
+/* N: 아직 I단계에서 정리하지 않은 줄 */
+.vrow.vwait { grid-template-columns: 44px 1fr; background: #FAFAF7; color: var(--muted); }
+.vwait-msg { padding-top: 4px; }

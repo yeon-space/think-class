@@ -244,21 +244,33 @@ window.SAMPLE_DATA = function () {
       changed: ['처음에는 무조건 좋다고만 생각했는데, AI 정보를 검증하면서 아직 모르는 위험도 많다는 것을 알게 됐다. 그래서 "조건이 있는 축복"으로 생각이 바뀌었다.',
                 '처음에는 기술만 생각했는데, 누가 그 혜택을 받을 수 있는지도 중요하다는 것을 알게 됐다.'],
       influence: ['반대 의견을 낸 친구 덕분에 위험도 함께 생각하게 됐다. AI는 사례를 빨리 알려 줬지만, 과장된 말도 있어서 꼭 확인해야 한다는 것을 배웠다.',
-                  '친구들의 댓글에서 "다른 점"을 읽으며 내 생각의 빈 곳을 찾았다. AI 답변은 출처가 없는 경우가 많아서 직접 찾아보는 습관이 생겼다.']
+                  '친구들의 댓글에서 "다른 점"을 읽으며 내 생각의 빈 곳을 찾았다. AI 답변은 출처가 없는 경우가 많아서 직접 찾아보는 습관이 생겼다.'],
+      groupTalk: ['혼자 생각할 때는 {key}의 좋은 점만 보였는데, 모둠에서 반대 의견을 듣고 해결안을 함께 만들면서 "어떤 조건에서" 좋은지까지 생각하게 됐다.',
+                  '모둠 친구가 "그럼 누가 그 비용을 내?"라고 물었을 때 말문이 막혔다. 그 질문 덕분에 내 주장에 빠진 부분을 채울 수 있었다.'],
+      aiView: ['처음에는 AI가 알려 주는 건 다 맞는 줄 알았다. 검증표를 쓰면서 AI도 틀린 말을 섞을 수 있다는 걸 알았고, 이제는 출처부터 확인한다.',
+               'AI는 사례를 빨리 찾아 주는 좋은 도구지만, 판단까지 맡기면 안 된다고 생각이 바뀌었다. AI 답을 우리 말로 다시 정리해 보니 이해도 더 잘 됐다.']
     },
     curse: {
       keep: ['한 번 바꾸면 되돌리기 어렵다는 걱정은 그대로다.', '신중해야 한다는 생각은 바뀌지 않았다.'],
       changed: ['처음에는 위험하니까 하지 말아야 한다고 생각했는데, 치료가 꼭 필요한 사람들이 있다는 것을 알고 "규칙을 지키며 조심해서 쓰자"로 바뀌었다.',
                 '무조건 반대했었는데, 위험을 줄이는 방법(작은 시험, 오랜 관찰)이 있다는 것을 알고 생각이 조금 열렸다.'],
       influence: ['찬성한 친구의 근거를 읽으면서 내가 한쪽만 봤다는 것을 알았다. AI는 정보를 많이 줬지만, 우리 모둠이 직접 검증하면서 진짜 믿을 수 있는 것만 남겼다.',
-                  '모둠 토의에서 친구들과 해결안을 함께 만들며 생각이 정리됐다. AI가 틀린 말을 한 것을 찾아냈을 때, AI도 확인이 필요하다는 것을 느꼈다.']
+                  '모둠 토의에서 친구들과 해결안을 함께 만들며 생각이 정리됐다. AI가 틀린 말을 한 것을 찾아냈을 때, AI도 확인이 필요하다는 것을 느꼈다.'],
+      groupTalk: ['나는 {key}가 위험하다고만 주장했는데, 찬성하는 친구의 이야기를 들으며 도움이 꼭 필요한 사람도 있다는 걸 알게 됐다. 그래서 금지보다 "조건을 정하자"는 쪽으로 의견이 모였다.',
+                  '모둠에서 의견이 갈렸지만, 서로 근거를 비교하다 보니 함께 받아들일 수 있는 해결안을 만들 수 있었다. 토의가 생각을 정리하는 데 가장 큰 도움이 됐다.'],
+      aiView: ['예전에는 AI에게 물으면 숙제가 끝난다고 생각했다. 하지만 AI 답 중 하나를 "제외"하면서, AI 답을 그대로 베끼면 틀린 내용까지 옮길 수 있다는 걸 느꼈다.',
+               'AI는 내가 몰랐던 사실을 알려 줬지만, 그 사실이 맞는지는 우리가 확인해야 했다. 앞으로는 AI 답을 "의견 하나"로 보고 다른 자료와 비교하겠다.']
     },
     both: {
       keep: ['쓰는 방법에 따라 달라진다는 생각은 그대로다.', '좋은 점과 위험한 점이 모두 있다는 생각은 끝까지 같다.'],
       changed: ['처음에는 막연하게 "둘 다"라고 생각했는데, 이제는 어떤 조건이면 축복이고 어떤 조건이면 재앙인지 구체적으로 말할 수 있게 됐다.',
                 '처음에는 결정하기 어렵다고만 생각했는데, 기준을 정하는 사람이 누구인지가 중요하다는 것을 알게 됐다.'],
       influence: ['친구들의 다양한 의견을 들으며 기준을 세울 수 있었다. AI 답변은 출발점으로는 좋았지만, 수용·수정·제외를 판단하며 내 생각으로 다시 정리했다.',
-                  '다른 모둠의 댓글이 우리 해결안을 더 구체적으로 만드는 데 도움이 됐다. AI는 사례 찾기에 유용했지만 판단은 우리가 해야 했다.']
+                  '다른 모둠의 댓글이 우리 해결안을 더 구체적으로 만드는 데 도움이 됐다. AI는 사례 찾기에 유용했지만 판단은 우리가 해야 했다.'],
+      groupTalk: ['모둠에 찬성과 반대가 모두 있어서, 가운데 입장인 내가 두 의견을 정리하는 역할을 했다. 그 과정에서 {key}에 대한 내 기준이 더 분명해졌다.',
+                  '다른 모둠 해결안에 댓글을 달면서, 우리 모둠이 생각하지 못한 방법을 발견했다. 의견을 주고받는 것이 생각을 넓혀 준다는 걸 느꼈다.'],
+      aiView: ['AI 답변이 너무 그럴듯해서 처음엔 의심하지 않았다. 수용·수정·제외를 하나씩 따져 보면서 "그럴듯한 것"과 "확인된 것"은 다르다는 걸 알게 됐다.',
+               'AI를 쓰기 전에 내 생각을 먼저 써 둔 게 도움이 됐다. 그래야 AI 답에 휩쓸리지 않고 내 생각과 비교할 수 있었다. 앞으로도 먼저 생각하고 AI를 쓰겠다.']
     }
   };
 
@@ -292,6 +304,18 @@ window.SAMPLE_DATA = function () {
   var T_WIP = { s32: 1 };                 // T카드 작성 중
   var K_NOT = { s08: 1, s23: 1, s32: 1 };  // K 아직 안 씀
   var K_HALF = { s16: 1, s27: 1 };         // K 결과물만 쓰고 성찰은 아직
+  var I_NOT = { s32: 1 };                  // I 답변 아직 기록 안 함 (→ N에 "I 먼저" 안내 줄)
+  var N_NOT = { s28: 1, s32: 1 };          // N 판단 아직 안 함
+
+  // AI가 섞어 넣은 틀린 말을 어느 질문 답변에 넣을지 (모둠별 질문 번호 0~3)
+  var FALSE_IN = [0, 0, 2, 2, 2, 1, 0, 0];
+  // "…다" → "…다고", "…이다" → "…이라고", "…것" → "…것이라고"
+  function quoteForm(claim) {
+    if (/이다$/.test(claim)) return claim.replace(/이다$/, '이라고');
+    if (/것$/.test(claim)) return claim + '이라고';
+    return claim + '고';
+  }
+  function plainForm(claim) { return /것$/.test(claim) ? claim + '이다.' : claim + '.'; }
 
   var ids = [], cn = 0, qn = 0, vn = 0;
   function sname(id) { return data.students[id].name; }
@@ -345,14 +369,23 @@ window.SAMPLE_DATA = function () {
       }
     });
 
-    /* H 질문 → I 답변 */
+    /* H 질문 → I 답변 : 학생마다 자기 질문 하나를 맡아 H·I·N을 이어서 함 */
+    var claim = st.extra[0].match(/"(.+)"/)[1], fq = FALSE_IN[g];
     var qids = st.qa.map(function (q, k) {
-      var qid = 'q' + pad(++qn);
-      data.questions[qid] = { group: G, text: q[0], createdAt: t(62 - g - k * 0.2), createdBy: sname(mem[k]) };
-      data.aianswers[qid] = {
-        group: G, answer: q[1], tool: TOOLS[(g + k) % TOOLS.length], hasSource: !!q[3], sourceNote: q[3],
-        summary: q[2], updatedBy: sname(mem[(k + 1) % 4]), updatedAt: t(48 - g - k)
+      var qid = 'q' + pad(++qn), who = mem[k];
+      data.questions[qid] = { group: G, text: q[0], createdAt: t(62 - g - k * 0.2), createdBy: sname(who), createdById: who };
+      if (I_NOT[who]) return qid;
+      var answer = q[1], summary = q[2];
+      if (k === fq) {   // AI 답변에 틀린 말이 섞여 들어온 경우 (N단계에서 걸러 내기)
+        answer += ' 참고로 ' + quoteForm(claim) + ' 볼 수 있습니다.';
+        summary += ' ' + plainForm(claim);
+      }
+      var a = {
+        group: G, answer: answer, tool: TOOLS[(g + k) % TOOLS.length], hasSource: !!q[3], sourceNote: q[3],
+        summary: summary, updatedBy: sname(who), updatedAt: t(48 - g - k)
       };
+      a['c_' + who] = t(48 - g - k);
+      data.aianswers[qid] = a;
       return qid;
     });
 
@@ -362,22 +395,29 @@ window.SAMPLE_DATA = function () {
       uniqueIdea: st.idea, uniqueIdeaBy: sname(mem[0]), uniqueIdeaAt: t(20 - g)
     };
 
-    /* N 검증표 */
+    /* N 검증표 : I단계 질문과 1:1 (질문 4개 → 4줄) */
     qids.forEach(function (qid, k) {
-      var d = st.v[k];
-      var edited = d[0] === '수정' && d[2];
-      data.verify['v' + pad(++vn)] = {
-        group: G, source: qid, question: st.qa[k][0],
-        info: edited ? d[2] : st.qa[k][2], infoEdited: !!edited,
-        decision: d[0], reason: d[1], createdAt: t(30 - g - k * 0.1),
-        updatedBy: sname(mem[k]), updatedAt: t(26 - g - k * 0.1)
+      var a = data.aianswers[qid], who = mem[k];
+      if (!a) return;   // I단계를 아직 안 한 질문은 N에 "I 먼저" 안내만 나옴
+      var row = {
+        group: G, source: qid, question: st.qa[k][0], info: a.summary, infoEdited: false,
+        decision: '', reason: '', createdAt: t(30 - g - k * 0.1), updatedBy: '', updatedAt: 0
       };
+      if (!N_NOT[who]) {
+        var d = st.v[k];
+        if (k === fq) {
+          // 틀린 말이 섞인 답변: 짝수 모둠은 틀린 부분만 지우고(수정), 홀수 모둠은 통째로 제외
+          d = g % 2 === 0
+            ? ['수정', '"' + claim + '"는 부분이 틀렸다. ' + st.extra[2] + ' 그래서 그 문장만 지우고 나머지는 남겼다.', st.qa[k][2]]
+            : ['제외', st.extra[2] + ' 틀린 내용이 섞여 있고 출처도 확인되지 않아서 이 정보는 쓰지 않기로 했다.'];
+        }
+        if (d[0] === '수정' && d[2]) { row.info = d[2]; row.infoEdited = true; }
+        row.decision = d[0]; row.reason = d[1];
+        row.updatedBy = sname(who); row.updatedAt = t(26 - g - k * 0.1);
+        row['c_' + who] = row.updatedAt;
+      }
+      data.verify['v' + pad(++vn)] = row;
     });
-    data.verify['v' + pad(++vn)] = {
-      group: G, source: '', question: '', info: st.extra[0], infoEdited: true,
-      decision: st.extra[1], reason: st.extra[2], createdAt: t(25 - g),
-      updatedBy: sname(mem[3]), updatedAt: t(24 - g)
-    };
 
     /* K 최종 결과물 + 성찰 */
     mem.forEach(function (id, k) {
@@ -386,10 +426,13 @@ window.SAMPLE_DATA = function () {
       var f = {
         text: st.final + '\n\n' + ['나는 특히 우리 모둠 아이디어인 "' + st.idea.split('"')[1] + '"가 꼭 필요하다고 생각한다.',
                                    '이를 위해 과학자, 정부, 시민이 함께 기준을 정하고 결과를 공개해야 한다.'][v],
-        link: k === 0 ? 'https://example.com/think-' + (g + 1) + '모둠-발표자료' : '',
         updatedAt: t(12 - g - k * 0.2)
       };
-      if (!K_HALF[id]) { f.keep = R.keep[v]; f.changed = R.changed[v]; f.influence = R.influence[v]; }
+      if (!K_HALF[id]) {
+        f.keep = R.keep[v]; f.changed = R.changed[v]; f.influence = R.influence[v];
+        f.groupTalk = R.groupTalk[(v + k) % 2].replace('{key}', st.key);
+        f.aiView = R.aiView[(v + g) % 2];
+      }
       data.finals[id] = f;
     });
   });
