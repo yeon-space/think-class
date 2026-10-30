@@ -280,7 +280,8 @@ window.SAMPLE_DATA = function () {
       lesson: {
         subject: '과학',
         title: '유전자 조작 기술, 인간에게 축복일까? 재앙일까?',
-        teacherCode: '1234',
+        teacherCode: '12341234',
+        teacherCodeRevision: '2026-10-30',
         groups: GROUPS.slice(),
         open: { T: true, H: true, I: true, N: true, K: true },
         prompts: {

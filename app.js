@@ -163,16 +163,16 @@
         jobs.push(DataStore.setDoc('verify', 'ai_' + q.id, {
           group: g, source: q.id, question: q.text, info: info, infoEdited: false, deleted: false,
           decision: '', reason: '', createdAt: q.createdAt || Date.now(), updatedBy: '', updatedAt: 0
-        }, { merge: true }));
+        }, { merge: true, expected: {source:null, info:null, updatedAt:null} }).catch(function(e){if(e.code !== 'conflict') throw e;}));
       } else if (!row.deleted && !row.infoEdited && row.info !== info) {
-        jobs.push(DataStore.setDoc('verify', row.id, { info: info }, { merge: true }));
+        jobs.push(DataStore.setDoc('verify', row.id, { info: info }, { merge: true, expected: {info:row.info == null ? null : row.info, infoEdited:row.infoEdited == null ? null : row.infoEdited, updatedAt:row.updatedAt == null ? null : row.updatedAt} }).catch(function(e){if(e.code !== 'conflict') throw e;}));
       }
     });
     return Promise.all(jobs).then(function () { return jobs.length; });
   }
   function syncVerifyAndRefresh() {
     if (S.tab !== 'N' || !S.user) return;
-    syncVerify(myGroup()).then(function (n) { if (n) refresh(false); });
+    return syncVerify(myGroup()).then(function (n) { if (n) return refresh(false); }).catch(actionError);
   }
   function gw(g) { return S.d.groupworkById[g] || {}; }
   function commentsOn(phase, tt, tid) {
@@ -185,7 +185,14 @@
   /* 입력값(초안) */
   function dv(key, fallback) { return Object.prototype.hasOwnProperty.call(S.drafts, key) ? S.drafts[key] : (fallback == null ? '' : fallback); }
   function take(key, fallback) { return String(dv(key, fallback)).trim(); }
+  var activeAction = null;
   function clearDrafts(prefix) {
+    if (activeAction) {
+      var captured = {};
+      Object.keys(S.drafts).forEach(function (k) { if (k === prefix || k.indexOf(prefix + '.') === 0) captured[k] = S.drafts[k]; });
+      activeAction.clears.push({prefix:prefix, values:captured});
+      return;
+    }
     Object.keys(S.drafts).forEach(function (k) {
       if (k === prefix || k.indexOf(prefix + '.') === 0) delete S.drafts[k];
     });
@@ -211,25 +218,42 @@
     if (kind === 'qe') { x = S.d.questionsById[id] || {}; return [x.updatedAt || 0, x.updatedBy || '', x.text || '']; }
     return [0, '', ''];
   }
-  function noteEditStart(key) {
-    var p = sharedPrefix(key);
-    if (p && !(p in S.base)) S.base[p] = stampOf(p)[0];
+  function sharedTarget(prefix) {
+    var dot=prefix.indexOf('.'), kind=prefix.slice(0,dot), id=prefix.slice(dot+1);
+    var spec = {
+      sol:['groupwork',['solution','solutionAt']], uniq:['groupwork',['uniqueIdea','uniqueIdeaAt']],
+      ai:['aianswers',['answer','tool','hasSource','sourceNote','summary','updatedAt']],
+      v:['verify',['info','infoEdited','decision','reason','updatedAt']], qe:['questions',['text','updatedAt']]
+    }[kind];
+    return {col:spec[0], id:id, fields:spec[1]};
   }
-  // 저장해도 되면 true(Promise). 친구가 먼저 저장했으면 물어보고, 아니면 최신 내용을 보여 줌
+  function expectedFields(prefix, value) {
+    var t=sharedTarget(prefix), record=value || S.d[t.col+'ById'][t.id] || {}, expected={};
+    t.fields.forEach(function(k){expected[k]=record[k] == null ? null : record[k];});
+    return expected;
+  }
+  function noteEditStart(key) {
+    var p=sharedPrefix(key);
+    if(p && !(p in S.base)) S.base[p]=expectedFields(p);
+  }
   function okToSave(prefix) {
-    var base = S.base[prefix], st = stampOf(prefix);
-    if (base == null || st[0] <= base || st[1] === me().name) return Promise.resolve(true);
-    return ask({
-      title: '친구가 먼저 저장했어요',
-      msg: st[1] + ' 님이 방금 이 칸을 먼저 저장했어요.\n내 글로 저장하면 친구가 쓴 글은 덮어써져요.',
-      ok: '내 글로 저장하기',
-      cancel: '친구 글 먼저 보기'
-    }).then(function (yes) {
-      if (yes) return true;
-      S.conflict[prefix] = true;
-      S.base[prefix] = st[0];   // 확인했으니, 다음 저장은 그대로 진행
-      render();
-      return false;
+    if (!(prefix in S.base)) S.base[prefix]=expectedFields(prefix);
+    return Promise.resolve(true);
+  }
+  function saveShared(prefix, col, id, data) {
+    var expected=S.base[prefix] || expectedFields(prefix);
+    return DataStore.setDoc(col,id,data,{merge:true,expected:expected}).catch(function(e){
+      if(e.code !== 'conflict') throw e;
+      var latest=e.current || {};
+      // Show exactly the version rejected by the transaction, even before the listener arrives.
+      S.d[col+'ById'][id]=Object.assign({},latest,{id:id});
+      S.base[prefix]=expectedFields(prefix,latest);
+      S.conflict[prefix]=true;
+      return ask({title:'친구가 먼저 저장했어요',msg:'다른 곳에서 이 내용을 먼저 수정했어요. 내 글은 그대로 남아 있어요. 최신 글을 확인하거나 내 글로 저장할 수 있어요.',ok:'내 글로 저장하기',cancel:'최신 글 먼저 보기'}).then(function(yes){
+        if(yes) return saveShared(prefix,col,id,data);
+        render();
+        var stop=new Error('conflict handled'); stop.code='conflict-handled'; throw stop;
+      });
     });
   }
   function conflictBox(prefix) {
@@ -320,7 +344,7 @@
     l = l || {};
     l.subject = l.subject || '';
     l.title = l.title || '새 수업';
-    l.teacherCode = l.teacherCode || '1234';
+    l.teacherCode = l.teacherCode || '12341234';
     l.groups = (l.groups && l.groups.length) ? l.groups : ['1모둠', '2모둠', '3모둠', '4모둠'];
     l.open = l.open || { T: true };
     l.prompts = l.prompts || {};
@@ -400,7 +424,7 @@
       '      <label class="lbl">교사 코드</label>' +
       '      <input type="password" data-d="login.code" data-enter="loginTeacher" value="' + esc(dv('login.code', '')) + '" placeholder="교사 코드 입력">' +
       '      <button class="btn primary" data-act="loginTeacher">교사로 입장</button>' +
-      (local ? '      <div class="sample-people"><small>샘플 교사 코드: <b>1234</b> (교사 관리에서 바꿀 수 있어요)</small></div>' : '') +
+      (local ? '      <div class="sample-people"><small>기본 교사 코드: <b>12341234</b> (교사 관리에서 바꿀 수 있어요)</small></div>' : '') +
       '    </div>' +
       '  </div>' +
       '</div>';
@@ -435,7 +459,7 @@
   function netMessage(code) {
     if (/resource-exhausted/.test(code)) return '오늘 무료 사용량을 다 썼어요 (오후 4~5시 초기화)';
     if (/permission-denied/.test(code)) return 'Firebase 보안 규칙 때문에 막혔어요';
-    if (/unavailable|failed-precondition|network/.test(code)) return '인터넷 연결이 불안정해요 (다시 연결되면 자동 저장)';
+    if (/unavailable|failed-precondition|network/.test(code)) return '인터넷 연결을 확인하고 저장 버튼을 다시 눌러 주세요';
     if (/script-load-failed/.test(code)) return 'Firebase를 불러오지 못했어요 (인터넷 확인)';
     return '저장 서버 연결에 문제가 있어요';
   }
@@ -1063,6 +1087,8 @@
    * ------------------------------------------------------------------ */
   function csvCell(v) {
     v = String(v == null ? '' : v);
+    // Quotes alone do not stop Excel from interpreting formulas.
+    if (/^[\s\uFEFF]*[=+@\-＝＋－＠]/.test(v) || /^[\t\r\n]/.test(v)) v = "'" + v;
     return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
   }
   function downloadCSV(name, rows) {
@@ -1171,7 +1197,7 @@
     },
     loginTeacher: function () {
       if (take('login.code') !== String(L().teacherCode)) return toast('교사 코드가 맞지 않아요');
-      setUser({ role: 'teacher', id: 'teacher', name: '선생님', group: '' });
+      return setUser({ role: 'teacher', id: 'teacher', name: '선생님', group: '' });
     },
 
     /* T */
@@ -1191,9 +1217,9 @@
       var prefix = 'c.' + phase + '.' + tt + '.' + tid;
       var fields = L().commentFields[phase].map(function (label, i) { return { label: label, value: take(prefix + '.' + i) }; });
       if (fields.some(function (f) { return !f.value; })) return toast('표의 모든 칸을 채워 주세요');
-      if (phase === 'H' && commentsOn(phase, tt, tid).length >= MAX_H_COMMENTS) { render(); return toast('🔒 이 카드는 댓글 ' + MAX_H_COMMENTS + '개가 이미 찼어요'); }
+      if (phase === 'H' && commentsOn(phase, tt, tid).length >= MAX_H_COMMENTS) return toast('이미 이 글에 댓글이 2개 달렸어요');
       clearDrafts(prefix);
-      return DataStore.addDoc('comments', {
+      return DataStore.addComment({
         phase: phase, targetType: tt, targetId: tid,
         targetGroup: tt === 'tcard' ? ((S.d.studentsById[tid] || {}).group || '') : tid,
         authorId: me().id, authorName: me().name, authorGroup: me().group || '',
@@ -1224,8 +1250,7 @@
       return okToSave('qe.' + id).then(function (ok) {
         if (!ok) return;
         clearDrafts('qe.' + id);
-        S.editingQ = null;
-        return DataStore.setDoc('questions', id, { text: text, updatedBy: me().name, updatedAt: Date.now() }, { merge: true }).then(function () { return done('질문을 수정했어요'); });
+        return saveShared('qe.' + id, 'questions', id, { text: text, updatedBy: me().name, updatedAt: Date.now() }).then(function () { S.editingQ = null; return done('질문을 수정했어요'); });
       });
     },
     delQ: function (el) {
@@ -1256,7 +1281,7 @@
       return okToSave(k).then(function (ok) {
         if (!ok) return;
         clearDrafts(k);
-        return DataStore.setDoc('aianswers', id, data, { merge: true })
+        return saveShared(k, 'aianswers', id, data)
           .then(function () { return refresh(true); })
           .then(function () { return syncVerify(g); })
           .then(function (n) { return done(n ? 'AI 답변을 저장했어요 · N단계 검증표에도 반영됐어요' : 'AI 답변 기록을 저장했어요'); });
@@ -1268,7 +1293,7 @@
       return okToSave('sol.' + g).then(function (ok) {
         if (!ok) return;
         clearDrafts('sol.' + g);
-        return DataStore.setDoc('groupwork', g, { solution: text, solutionBy: me().name, solutionAt: Date.now() }, { merge: true })
+        return saveShared('sol.' + g, 'groupwork', g, { solution: text, solutionBy: me().name, solutionAt: Date.now() })
           .then(function () { return done('중간 해결안을 저장했어요'); });
       });
     },
@@ -1289,7 +1314,7 @@
       return okToSave(k).then(function (ok) {
         if (!ok) return;
         clearDrafts(k);
-        return DataStore.setDoc('verify', id, data, { merge: true }).then(function () { return done('검증 내용을 저장했어요'); });
+        return saveShared(k, 'verify', id, data).then(function () { return done('검증 내용을 저장했어요'); });
       });
     },
     saveUniq: function () {
@@ -1298,7 +1323,7 @@
       return okToSave('uniq.' + g).then(function (ok) {
         if (!ok) return;
         clearDrafts('uniq.' + g);
-        return DataStore.setDoc('groupwork', g, { uniqueIdea: text, uniqueIdeaBy: me().name, uniqueIdeaAt: Date.now() }, { merge: true })
+        return saveShared('uniq.' + g, 'groupwork', g, { uniqueIdea: text, uniqueIdeaBy: me().name, uniqueIdeaAt: Date.now() })
           .then(function () { return done('우리 모둠 아이디어를 저장했어요'); });
       });
     },
@@ -1358,8 +1383,7 @@
       if (!list.length) return toast('항목을 하나 이상 입력해 주세요');
       var cf = Object.assign({}, L().commentFields);
       cf[ph] = list;
-      S.cfEdit[ph] = null;
-      return DataStore.setDoc('config', 'lesson', { commentFields: cf }, { merge: true }).then(function () { return done(ph + ' 단계 댓글 양식을 저장했어요'); });
+      return DataStore.setDoc('config', 'lesson', { commentFields: cf }, { merge: true }).then(function () { S.cfEdit[ph] = null; return done(ph + ' 단계 댓글 양식을 저장했어요'); });
     },
     resetData: function (el) {
       var c = el.dataset.class || S.classId;
@@ -1478,15 +1502,29 @@
   /* ------------------------------------------------------------------
    * 이벤트 연결
    * ------------------------------------------------------------------ */
+  function actionError(err) {
+    if(err.code === 'conflict-handled') return;
+    console.error(err);
+    toast(err.code === 'comment-limit' ? '이미 이 글에 댓글이 2개 달렸어요' : '저장하지 못했어요. 작성한 글은 남아 있어요. 연결을 확인하고 다시 저장해 주세요.');
+  }
+  function runAction(fn, el) {
+    if(activeAction) { toast('처리 중이에요. 잠시 기다려 주세요.'); return; }
+    var context={clears:[]}; activeAction=context;
+    return Promise.resolve().then(function(){return fn(el);}).then(function(){
+      context.clears.forEach(function(c){
+        Object.keys(c.values).forEach(function(k){if(S.drafts[k] === c.values[k]) delete S.drafts[k];});
+        var remains=Object.keys(S.drafts).some(function(k){return k === c.prefix || k.indexOf(c.prefix+'.') === 0;});
+        if(!remains){delete S.base[c.prefix]; delete S.conflict[c.prefix];}
+        else if(sharedPrefix(c.prefix) || /^(ai|v)\./.test(c.prefix)) S.base[c.prefix]=expectedFields(c.prefix);
+      });
+    }).catch(actionError).then(function(){activeAction=null; if(S.d) render();});
+  }
   document.addEventListener('click', function (e) {
     var el = e.target.closest('[data-act]');
     if (!el || el.disabled) return;
     var fn = A[el.dataset.act];
     if (!fn) return;
-    try {
-      var r = fn(el);
-      if (r && r.catch) r.catch(function (err) { console.error(err); toast('저장하지 못했어요. 다시 시도해 주세요'); });
-    } catch (err) { console.error(err); toast('문제가 생겼어요'); }
+    runAction(fn, el);
   });
 
   document.addEventListener('input', function (e) {
@@ -1507,6 +1545,13 @@
 
   document.addEventListener('change', function (e) {
     var t = e.target;
+    if (activeAction && t.dataset && t.dataset.change) {
+      if (t.dataset.change === 'classSel') t.value = S.classId;
+      if (t.dataset.change === 'tgroup') t.value = myGroup();
+      if (t.dataset.change === 'flowGroup') t.value = S.flowGroup;
+      toast('저장 처리가 끝난 뒤 이동해 주세요.');
+      return;
+    }
     if (t.dataset && t.dataset.d !== undefined && (t.type === 'checkbox' || t.type === 'radio' || t.tagName === 'SELECT')) {
       noteEditStart(t.dataset.d);
       if (t.type === 'checkbox') S.drafts[t.dataset.d] = t.checked;
@@ -1524,8 +1569,7 @@
       var fn = A[t.dataset.enter];
       if (fn) {
         t.blur();
-        var r = fn(t);
-        if (r && r.catch) r.catch(function (err) { console.error(err); toast('저장하지 못했어요'); });
+        runAction(fn,t);
       }
     }
   });
@@ -1581,9 +1625,10 @@
     }, 15000);
 
     DataStore.onError(function (code) { S.netError = netMessage(code); renderSync(); toast('⚠️ ' + S.netError); });
-    DataStore.onSync(function (n) {
+    DataStore.onSync(function (n, failed) {
       S.syncing = n;
-      if (n === 0) S.netError = '';
+      if (n === 0 && !failed) S.netError = '';
+      if (failed && !S.netError) S.netError = '저장하지 못한 작업이 있어요. 다시 저장해 주세요.';
       renderSync();
     });
 

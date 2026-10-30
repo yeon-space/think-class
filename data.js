@@ -57,12 +57,22 @@
     var ls = [];
     return {
       on: function (cb) { ls.push(cb); return function () { ls = ls.filter(function (f) { return f !== cb; }); }; },
-      emit: function (x) { ls.slice().forEach(function (f) { try { f(x); } catch (e) { console.error(e); } }); }
+      emit: function () { var args = arguments; ls.slice().forEach(function (f) { try { f.apply(null, args); } catch (e) { console.error(e); } }); }
     };
   }
   function debounce(fn, ms) {
     var t;
     return function () { clearTimeout(t); t = setTimeout(fn, ms); };
+  }
+
+  function conflict(current) { var e = new Error('conflict'); e.code = 'conflict'; e.current = clone(current || {}); return e; }
+  function checkExpected(current, expected) {
+    if (expected && Object.keys(expected).some(function (k) { return JSON.stringify(current[k] == null ? null : current[k]) !== JSON.stringify(expected[k]); })) throw conflict(current);
+  }
+  function commentLimit() { var e = new Error('이미 이 글에 댓글이 2개 달렸어요'); e.code = 'comment-limit'; return e; }
+  function migrateCode(lesson) {
+    if (lesson.teacherCodeRevision !== '2026-10-30') { lesson.teacherCode = '12341234'; lesson.teacherCodeRevision = '2026-10-30'; }
+    return lesson;
   }
 
   window.DataStore = useFirebase ? createFirebaseStore() : createLocalStore();
@@ -84,6 +94,7 @@
         raw = initialData(c || classId);
         localStorage.setItem(key(c), JSON.stringify(raw));
       }
+      if (raw.config && raw.config.lesson && raw.config.lesson.teacherCodeRevision !== '2026-10-30') { migrateCode(raw.config.lesson); localStorage.setItem(key(c), JSON.stringify(raw)); }
       return raw;
     }
     function write(db) { localStorage.setItem(key(), JSON.stringify(db)); changes.emit(); }
@@ -123,11 +134,28 @@
       findDocs: function (col, where) { return this.listDocs(col, where); },
 
       setDoc: function (col, id, data, opt) {
-        var db = read();
-        db[col] = db[col] || {};
-        db[col][id] = (opt && opt.merge) ? Object.assign({}, db[col][id] || {}, stripId(data)) : stripId(data);
-        write(db);
-        return Promise.resolve();
+        var c = classId;
+        function save() {
+          var db = read(c);
+          db[col] = db[col] || {};
+          checkExpected(db[col][id] || {}, opt && opt.expected);
+          db[col][id] = (opt && opt.merge) ? Object.assign({}, db[col][id] || {}, stripId(data)) : stripId(data);
+          localStorage.setItem(key(c), JSON.stringify(db)); changes.emit();
+        }
+        if (navigator.locks) return navigator.locks.request('think-data-' + c, save);
+        return Promise.resolve().then(save);
+      },
+      addComment: function (data) {
+        var c = classId;
+        function save() {
+          var db = read(c), all = db.comments || {};
+          if (data.phase === 'H' && Object.keys(all).filter(function (id) { var x = all[id]; return x.phase === 'H' && x.targetType === data.targetType && x.targetId === data.targetId; }).length >= 2) throw commentLimit();
+          var id = 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+          db.comments = all; all[id] = stripId(data);
+          localStorage.setItem(key(c), JSON.stringify(db)); changes.emit(); return id;
+        }
+        if (navigator.locks) return navigator.locks.request('think-data-' + c, save);
+        return Promise.reject(new Error('이 브라우저에서는 댓글 동시 저장 보호를 지원하지 않아요. 최신 Chrome 또는 Edge를 사용해 주세요.'));
       },
       addDoc: function (col, data) {
         var id = 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -218,10 +246,16 @@
     function colRef(col, c) { return db.collection('classes').doc(c || classId).collection(col); }
 
     // 저장 진행 상황 (화면의 "저장 중…" 표시용)
-    function track(p) {
-      pending++; syncEv.emit(pending);
-      return p.then(function (r) { pending--; syncEv.emit(pending); return r; },
-                    function (e) { pending--; syncEv.emit(pending); report(e); });
+    var failed = {};
+    function track(p, key) {
+      key = key || 'operation';
+      pending++; syncEv.emit(pending, Object.keys(failed).length > 0);
+      return p.then(function (r) {
+        delete failed[key]; pending--; syncEv.emit(pending, Object.keys(failed).length > 0); return r;
+      }, function (e) {
+        if (e.code !== 'conflict' && e.code !== 'comment-limit') { failed[key] = true; report(e); }
+        pending--; syncEv.emit(pending, Object.keys(failed).length > 0); throw e;
+      });
     }
 
     /* 역할에 따라 실시간으로 받을 범위 */
@@ -250,7 +284,15 @@
 
     function ensureLesson(c) {
       return colRef('config', c).doc('lesson').get().then(function (snap) {
-        if (snap.exists) return;
+        if (snap.exists) {
+          if (snap.data().teacherCodeRevision === '2026-10-30') return;
+          return db.runTransaction(function (tx) {
+            var ref = colRef('config', c).doc('lesson');
+            return tx.get(ref).then(function (s) {
+              if (s.exists && s.data().teacherCodeRevision !== '2026-10-30') tx.set(ref, {teacherCode: '12341234', teacherCodeRevision: '2026-10-30'}, {merge:true});
+            });
+          });
+        }
         var data = initialData(c), ops = [];
         Object.keys(data).forEach(function (col) {
           Object.keys(data[col]).forEach(function (id) { ops.push({ ref: colRef(col, c).doc(id), data: data[col][id] }); });
@@ -306,7 +348,7 @@
           });
       },
       saveClasses: function (list) {
-        return ready.then(function () { track(db.collection('meta').doc('app').set({ classes: list }, { merge: true })); });
+        return ready.then(function () { return track(db.collection('meta').doc('app').set({ classes: list }, { merge: true }), 'classes'); });
       },
 
       connect: function (sc) {
@@ -367,29 +409,70 @@
       setDoc: function (col, id, data, opt) {
         return ready.then(function () {
           var clean = stripId(data), merge = !!(opt && opt.merge);
-          applyLocal(col, id, clean, merge, false);
-          track(colRef(col).doc(id).set(clean, { merge: merge }));
+          var ref = colRef(col).doc(id);
+          var write = opt && opt.expected ? db.runTransaction(function (tx) {
+            return tx.get(ref).then(function (snap) {
+              checkExpected(snap.exists ? snap.data() : {}, opt.expected);
+              tx.set(ref, clean, {merge:merge});
+            });
+          }) : ref.set(clean, {merge:merge});
+          return track(write, ref.path);
+        });
+      },
+      addComment: function (data) {
+        if (data.phase !== 'H' || data.targetType !== 'tcard') return this.addDoc('comments', data);
+        var c = classId;
+        return ready.then(function () {
+          var comments = colRef('comments', c), card = colRef('tcards', c).doc(data.targetId), ref = comments.doc();
+          return track(comments.where('targetId', '==', data.targetId).get().then(function (existing) {
+            var legacy = existing.docs.filter(function (s) { var x=s.data(); return x.phase === 'H' && x.targetType === 'tcard'; }).map(function (s) { return s.id; });
+            return db.runTransaction(function (tx) {
+              return tx.get(card).then(function (s) {
+                if (!s.exists) throw new Error('댓글을 달 글이 없어졌어요.');
+                var ids = s.data().hCommentIds;
+                if (!Array.isArray(ids)) ids = legacy;
+                return Promise.all(ids.map(function (id) { return tx.get(comments.doc(id)); })).then(function (snaps) {
+                  var live = ids.filter(function (_, i) { return snaps[i].exists; });
+                  if (live.length >= 2) throw commentLimit();
+                  tx.set(card, {hCommentIds:live.concat([ref.id])}, {merge:true});
+                  tx.set(ref, stripId(data));
+                  return ref.id;
+                });
+              });
+            });
+          }), 'comment/' + c + '/' + data.targetId);
         });
       },
       addDoc: function (col, data) {
         return ready.then(function () {
           var ref = colRef(col).doc();
           var clean = stripId(data);
-          applyLocal(col, ref.id, clean, false, false);
-          track(ref.set(clean));
-          return ref.id;
+          return track(ref.set(clean), ref.path).then(function () { return ref.id; });
         });
       },
       deleteDoc: function (col, id) {
         return ready.then(function () {
-          applyLocal(col, id, null, false, true);
-          track(colRef(col).doc(id).delete());
+          var ref = colRef(col).doc(id);
+          if (col !== 'comments') return track(ref.delete(), ref.path);
+          return track(db.runTransaction(function (tx) {
+            return tx.get(ref).then(function (snap) {
+              if (!snap.exists) return;
+              var c = snap.data();
+              if (c.phase !== 'H' || c.targetType !== 'tcard') { tx.delete(ref); return; }
+              var card = colRef('tcards').doc(c.targetId);
+              return tx.get(card).then(function (s) {
+                var ids = s.exists && s.data().hCommentIds;
+                if (ids) tx.set(card, {hCommentIds:ids.filter(function (x) { return x !== id; })}, {merge:true});
+                tx.delete(ref);
+              });
+            });
+          }), ref.path);
         });
       },
       setDocInClasses: function (ids, col, docId, data, opt) {
         return ready.then(function () {
           var clean = stripId(data), merge = !!(opt && opt.merge);
-          if (ids.indexOf(classId) >= 0) applyLocal(col, docId, clean, merge, false);
+          // The snapshot listener updates the screen after the server acknowledges the batch.
           var b = db.batch();
           ids.forEach(function (c) { b.set(colRef(col, c).doc(docId), clean, { merge: merge }); });
           return track(b.commit());
