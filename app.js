@@ -29,7 +29,7 @@
   var TFIELDS = [
     { f: 'claim', label: '초기 주장', ph: '유전자 조작 기술은 인간에게 ○○이다. (나의 입장)' },
     { f: 'reason', label: '근거', ph: '왜 그렇게 생각하나요? 알고 있는 사실이나 경험을 적어요.' },
-    { f: 'solution', label: '해결 방안', ph: '문제를 줄이거나 더 좋게 쓰려면 어떻게 해야 할까요?' }
+    { f: 'solution', label: '보완방안', ph: '문제나 우려를 줄이고 더 나은 방향으로 활용하려면 어떻게 해야 할까요?' }
   ];
   var KFIELDS = [
     { f: 'keep', label: '유지된 생각', ph: '처음 생각 중에서 끝까지 그대로인 생각은 무엇인가요?' },
@@ -1150,7 +1150,7 @@
     if (c.submitted) return toast('이미 제출한 카드예요');
     var v = {};
     TFIELDS.forEach(function (f) { v[f.f] = take('T.' + f.f, c[f.f]); });
-    if (submit && (!v.claim || !v.reason || !v.solution)) return toast('주장, 근거, 해결 방안을 모두 채워 주세요');
+    if (submit && (!v.claim || !v.reason || !v.solution)) return toast('주장, 근거, 보완방안을 모두 채워 주세요');
     var go = submit
       ? ask({ title: '제출할까요?', msg: '제출하면 더 이상 수정할 수 없어요.', ok: '제출하기' })
       : Promise.resolve(true);
@@ -1460,7 +1460,7 @@
       });
     },
     exportCSV: function () {
-      var header = ['모둠', '이름', 'T 초기 주장', 'T 근거', 'T 해결 방안', 'T 제출', 'H 모둠 AI 질문', 'H 쓴 댓글 수', 'H 받은 댓글 수',
+      var header = ['모둠', '이름', 'T 초기 주장', 'T 근거', 'T 보완방안', 'T 제출', 'H 모둠 AI 질문', 'H 쓴 댓글 수', 'H 받은 댓글 수',
         'I AI 답변 기록(도구/출처/우리 말 정리)', 'I 모둠 중간 해결안', 'N 검증표', 'N 우리 모둠만의 아이디어',
         'K 최종 결과물'].concat(KFIELDS.map(function (x) { return 'K ' + x.label; }));
       var rows = [header];
