@@ -817,6 +817,9 @@
       '<a href="https://www.scienceall.com/" target="_blank" rel="noopener noreferrer">사이언스올 · 과학백과 ↗</a>' +
       '<a href="https://www.foodsafetykorea.go.kr/" target="_blank" rel="noopener noreferrer">식품안전나라 · 식품·GMO ↗</a>' +
       '<a href="https://www.nibr.go.kr/" target="_blank" rel="noopener noreferrer">국립생물자원관 · 생물·생태 ↗</a>' +
+      '<a href="https://terms.naver.com/" target="_blank" rel="noopener noreferrer">네이버 지식백과 · 과학백과 ↗</a>' +
+      '<a href="https://www.dongascience.com/ko" target="_blank" rel="noopener noreferrer">동아사이언스 · 과학 뉴스 ↗</a>' +
+      '<a href="https://science.ytn.co.kr/" target="_blank" rel="noopener noreferrer">YTN 사이언스 · 과학 뉴스 ↗</a>' +
       '</div></div>';
     var count = { '수용': 0, '수정': 0, '제외': 0 };
     qs.forEach(function (q) { var r = byQ[q.id]; if (r && count[r.decision] != null) count[r.decision]++; });

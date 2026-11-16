@@ -495,7 +495,7 @@ table.data tr.grp td { background: #FBF8F3; font-weight: 800; color: var(--muted
 .source-links { margin: 14px 0; padding: 16px; border-radius: 12px; background: #eef5fb; border: 1px solid #c9ddf2; }
 .source-links p { margin: 5px 0 10px; font-size: .9em; }
 .source-links div { display: flex; flex-wrap: wrap; gap: 8px; }
-.source-links a { display: inline-block; background: white; border: 1px solid #9fbfdd; border-radius: 8px; padding: 8px 12px; color: #175889; text-decoration: none; font-weight: 700; }
+.source-links a { display: inline-block; box-sizing: border-box; max-width: 100%; overflow-wrap: anywhere; background: white; border: 1px solid #9fbfdd; border-radius: 8px; padding: 8px 12px; color: #175889; text-decoration: none; font-weight: 700; }
 .source-links a:focus-visible { outline: 3px solid #295fab; outline-offset: 2px; }
 .t-editor textarea.needs-detail { background: #fff1f3; border-color: #d88395; }
 .t-editor .t-hint { display: block; margin: 3px 0 9px; color: #9a4558; }
