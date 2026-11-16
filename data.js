@@ -203,7 +203,8 @@
         return Promise.resolve(Object.keys(p)
           .filter(function (k) { return k.indexOf(pre) === 0 && now - p[k].t < ms; })
           .map(function (k) { return Object.assign({}, p[k], { id: k.slice(pre.length) }); }));
-      }
+      },
+      refreshPresence: function () { return this.listPresence(); }
     };
   }
 
@@ -518,6 +519,22 @@
           return Object.keys(all)
             .filter(function (id) { return now - (all[id].t || 0) < ONLINE_MS; })
             .map(function (id) { return Object.assign({}, all[id], { id: id }); });
+        });
+      },
+      refreshPresence: function () {
+        return ready.then(function () {
+          var active = listeners.filter(function (l) { return l.spec.presence; });
+          return Promise.all(active.map(function (l) {
+            var ref = colRef('presence');
+            if (l.spec.where) Object.keys(l.spec.where).forEach(function (k) { ref = ref.where(k, '==', l.spec.where[k]); });
+            return ref.get({ source: 'server' }).then(function (snap) {
+              var docs = {}; snap.docs.forEach(function (d) { docs[d.id] = d.data(); }); l.docs = docs;
+            });
+          })).then(function () {
+            var all = docsOf('presence'), now = Date.now();
+            return Object.keys(all).filter(function (id) { return now - (all[id].t || 0) < ONLINE_MS; })
+              .map(function (id) { return Object.assign({}, all[id], { id: id }); });
+          });
         });
       }
     };

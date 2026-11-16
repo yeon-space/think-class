@@ -182,6 +182,33 @@
   }
   function isOnline(id) { return S.presence.some(function (p) { return p.id === id; }); }
 
+  // 숫자는 최소한의 안내 기준이며 글의 정확성이나 근거의 질을 판정하지 않아요.
+  var T_MIN = { claim: 8, reason: 20, solution: 15 };
+  function tFieldProblem(name, value) {
+    var v = String(value || '').trim();
+    if (!v) return '아직 작성하지 않았어요.';
+    if (v.replace(/\s/g, '').length < T_MIN[name]) return '내용을 더 자세히 적어 보세요. (공백 제외 ' + T_MIN[name] + '자 이상)';
+    if (/^(그냥|모르겠|자료에\s*있어서|몰라|없음)[.!?\s]*$/.test(v)) return '생각한 이유를 더 자세히 적어 보세요.';
+    return '';
+  }
+  function updateTValidation(root) {
+    var panel = (root || document).querySelector('.t-editor');
+    if (!panel) return;
+    var allValid = true;
+    TFIELDS.forEach(function (f) {
+      var input = panel.querySelector('[data-d="T.' + f.f + '"]');
+      var hint = panel.querySelector('[data-t-hint="' + f.f + '"]');
+      if (!input) return;
+      var msg = tFieldProblem(f.f, input.value);
+      allValid = allValid && !msg;
+      input.classList.toggle('needs-detail', !!msg);
+      input.setAttribute('aria-invalid', msg ? 'true' : 'false');
+      if (hint) hint.textContent = msg || '작성했어요.';
+    });
+    var submit = panel.querySelector('[data-act="submitT"]');
+    if (submit) submit.disabled = !allValid;
+  }
+
   /* 입력값(초안) */
   function dv(key, fallback) { return Object.prototype.hasOwnProperty.call(S.drafts, key) ? S.drafts[key] : (fallback == null ? '' : fallback); }
   function take(key, fallback) { return String(dv(key, fallback)).trim(); }
@@ -388,6 +415,7 @@
     renderPresence();
     renderSync();
     updateCommentButtons(app);
+    updateTValidation(app);
   }
 
   /* ---------- 입장 화면 ---------- */
@@ -483,6 +511,7 @@
           return '<span class="pchip ' + (on ? 'on' : '') + '">' + esc(s.name) + (s.id === me().id ? ' (나)' : '') + '</span>';
         }).join('');
     }
+    if (isTeacher()) html += '<button class="btn small presence-refresh" data-act="refreshPresence">🔄 접속 상태 새로고침</button><small class="presence-help">최근 신호 기준이에요</small>';
     box.innerHTML = html;
   }
 
@@ -542,10 +571,26 @@
         '</select></div>';
     }
     var lockNote = (isTeacher() && !isOpen(k)) ? ' <span class="status">🔒 학생에게 잠김</span>' : '';
+    var guides = {
+      T:'자료를 읽고 나의 주장, 근거와 보완방안을 적은 뒤 제출해요.',
+      H:'친구의 생각을 읽고 댓글을 나누며 AI에게 물어볼 질문을 만들어요.',
+      I:'모둠 질문을 AI에게 묻고 답변을 기록한 뒤 우리 말로 정리해요.',
+      N:'믿을 만한 자료를 찾아 AI 답변을 검증하고 판단 근거를 적어요.',
+      K:'최종 생각을 정리하고 T단계와 비교하며 활동을 돌아봐요.'
+    };
+    var pending = '';
+    if (!isTeacher() && S.d) {
+      var c = S.d.tcardsById[me().id] || {}, f = S.d.finalsById[me().id] || {};
+      if (k === 'T') pending = c.submitted ? '✅ T단계 생각을 제출했어요.' : '⬜ 아직 T단계 생각을 제출하지 않았어요.';
+      else if (DID[k]) pending = DID[k](me()) ? '✅ 나의 할 일에 참여했어요.' : '⬜ 아직 나의 할 일을 하지 않았어요. ' + TODO[k];
+      else if (k === 'K') pending = f.text ? '✅ 최종 결과물을 저장했어요.' : '⬜ 아직 최종 결과물을 저장하지 않았어요.';
+    }
     return '<div class="phase-head ph-' + k + '"><div class="big">' + k + '</div><div>' +
       '<h2>' + p.icon + ' ' + p.title + lockNote + '</h2>' + enName(p) +
       (L().prompts[k] ? '<p class="q">' + nl(L().prompts[k]) + '</p>' : '') +
-      '</div>' + pick + '</div>';
+      '</div>' + pick + '</div>' +
+      '<div class="phase-guide ph-' + k + '"><b>이 단계에서 할 일</b><span>' + guides[k] + '</span>' +
+      (pending ? '<small>' + pending + '</small>' : '') + '</div>';
   }
 
   function section(k, title, right) {
@@ -639,11 +684,11 @@
         '<span class="right">' + tStatus(c) + ' <small>' + fmt(c.submittedAt) + '</small></span></div>' + tCardBody(c) +
         '<div class="notice info" style="margin:16px 0 0">제출한 카드는 수정할 수 없어요. 이 생각은 K단계에서 지금의 생각과 비교하게 돼요.</div></div>';
     } else {
-      out += '<div class="card accent ph-T">' +
+      out += '<div class="card accent ph-T t-editor">' +
         TFIELDS.map(function (f) {
-          return '<label class="lbl">' + f.label + '</label>' + ta('T.' + f.f, c && c[f.f], f.ph, f.f === 'claim' ? 2 : 4);
+          return '<label class="lbl">' + f.label + '</label>' + ta('T.' + f.f, c && c[f.f], f.ph, f.f === 'claim' ? 2 : 4) + '<small class="t-hint" data-t-hint="' + f.f + '"></small>';
         }).join('') +
-        '<div class="btn-row"><button class="btn primary ph-T" data-act="submitT">제출하기</button>' +
+        '<div class="btn-row"><button class="btn primary ph-T" data-act="submitT" disabled>제출하기</button>' +
         '<button class="btn" data-act="saveTDraft">임시 저장</button>' +
         '<span class="meta">⚠️ 제출하면 수정할 수 없어요.' + (c && c.updatedAt ? ' · 마지막 저장 ' + fmt(c.updatedAt) : '') + '</span></div>' +
         '</div>';
@@ -660,6 +705,11 @@
   function renderH() {
     var g = myGroup();
     var out = phaseHead('H', true);
+
+    if (!isTeacher()) {
+      var writtenH = S.d.comments.filter(function (c) { return c.phase === 'H' && c.targetType === 'tcard' && c.authorId === me().id; }).length;
+      out += '<div class="notice info">💬 서로 다른 친구 두 명에게 댓글을 하나씩 남겨요. 각 친구 카드에는 댓글이 최대 2개 달려요. 내가 쓴 댓글: ' + writtenH + '개. 빈 카드가 내 카드뿐이면 친구와 상의해 댓글을 삭제하고 다시 나눠 주세요.</div>';
+    }
 
     out += section('H', '💭 ' + esc(g) + ' 친구들의 초기 생각');
     var mem = membersOf(g);
@@ -763,6 +813,11 @@
     var g = myGroup();
     var out = phaseHead('N', true);
     var qs = groupQs(g), byQ = verifyByQ(g);
+    out += '<div class="source-links"><b>🔎 믿을 만한 자료를 직접 찾아봐요</b><p>아래 사이트에서 검색한 뒤 자료의 작성 기관과 날짜도 확인해요.</p><div>' +
+      '<a href="https://www.scienceall.com/" target="_blank" rel="noopener noreferrer">사이언스올 · 과학백과 ↗</a>' +
+      '<a href="https://www.foodsafetykorea.go.kr/" target="_blank" rel="noopener noreferrer">식품안전나라 · 식품·GMO ↗</a>' +
+      '<a href="https://www.nibr.go.kr/" target="_blank" rel="noopener noreferrer">국립생물자원관 · 생물·생태 ↗</a>' +
+      '</div></div>';
     var count = { '수용': 0, '수정': 0, '제외': 0 };
     qs.forEach(function (q) { var r = byQ[q.id]; if (r && count[r.decision] != null) count[r.decision]++; });
 
@@ -821,6 +876,32 @@
     return '<div class="mine"><h3>💭 ' + (title || '나의 처음 생각 (T단계)') + '</h3>' +
       (c && (c.claim || c.reason || c.solution) ? tCardBody(c) : '<div class="empty">T단계 카드가 없어요.</div>') + '</div>';
   }
+  function presentationPrompt(g) {
+    var members = membersOf(g), w = gw(g), qs = groupQs(g), rows = groupVerify(g);
+    var lines = [
+      '중학교 3학년 과학 수업의 유전자 조작 토론 발표자료를 만들어 주세요.',
+      '형식: 가로 16:9, 한 장의 발표 슬라이드. 멀리서도 읽히는 큰 한글 글씨와 넉넉한 여백을 사용합니다.',
+      '색상: 크림색 배경과 주황·노랑·청록·파랑·보라 포인트. 과학과 대화에 어울리는 간결한 일러스트를 넣습니다.',
+      '구성: 주제, 모둠원들의 처음 의견, 토론·AI 검증에서 확인한 내용, 모둠의 최종 주장·근거·보완방안.',
+      '의견이 달랐던 과정과 변화가 보이게 하되 자료에 없는 사실이나 합의는 만들지 마세요.',
+      '정보가 없으면 ‘아직 작성하지 않음’으로 표시하고 학생 개인정보나 실명은 넣지 마세요.',
+      '', '수업 주제: ' + (L().title || ''), '모둠: ' + g, '', '[T 처음 의견]'
+    ];
+    members.forEach(function (s, i) {
+      var c = S.d.tcardsById[s.id] || {};
+      lines.push('모둠원 ' + (i + 1) + ': 주장 ' + (c.claim || '미작성') + ' / 근거 ' + (c.reason || '미작성') + ' / 보완방안 ' + (c.solution || '미작성'));
+    });
+    lines.push('', '[H 질문]');
+    qs.forEach(function (q, i) { lines.push((i + 1) + '. ' + q.text); });
+    lines.push('', '[I AI 답변 정리]');
+    qs.forEach(function (q, i) { var a=S.d.aianswersById[q.id] || {}; lines.push((i + 1) + '. ' + (a.summary || '미작성')); });
+    lines.push('모둠 중간 해결안: ' + (w.solution || '미작성'), '', '[N 검증]');
+    rows.forEach(function (v) { lines.push((v.info || '정보 미작성') + ' / 판단: ' + (v.decision || '미작성') + ' / 근거: ' + (v.reason || '미작성')); });
+    lines.push('우리 모둠의 아이디어: ' + (w.uniqueIdea || '미작성'));
+    if (!isTeacher()) lines.push('', '[내 K 최종 결과물]', (S.d.finalsById[me().id] || {}).text || '미작성');
+    lines.push('', '위 기록은 토의 중간 과정일 수 있습니다. 최종 합의가 기록되지 않았다면 임의로 확정하지 말고, 작성자가 확인할 수 있도록 표시해 주세요.');
+    return lines.join('\n');
+  }
   function renderK() {
     var out = phaseHead('K', true);
     if (isTeacher()) {
@@ -853,6 +934,11 @@
       KFIELDS.map(function (x) { return '<label class="lbl">' + x.label + '</label>' + ta('K.' + x.f, f[x.f], x.ph, 4); }).join('') +
       '<div class="btn-row"><button class="btn primary ph-K" data-act="saveFinal">성찰 저장</button></div>' +
       '</div></div>';
+    out += section('K', '🎨 모둠 발표자료 만들기');
+    out += '<div class="card accent ph-K"><p>모둠 기록을 바탕으로 가로 한 장 발표자료를 만들 프롬프트예요. 복사해 Canva나 Gemini에 붙여 넣고 결과를 확인해요.</p>' +
+      '<p class="privacy-note">외부 도구에 붙여 넣으면 내용이 해당 서비스로 전송돼요. 이름은 자동으로 빼지만, 글 속 개인정보가 남아 있는지 꼭 확인하고 지워 주세요. 이 기기에서 확인 가능한 기록만 포함돼요.</p>' +
+      '<textarea id="presentation-prompt" data-d="presentation.prompt" rows="8" aria-label="발표자료 생성 프롬프트">' + esc(dv('presentation.prompt', presentationPrompt(myGroup()))) + '</textarea>' +
+      '<div class="btn-row"><button class="btn primary ph-K" data-act="copyPresentationPrompt">발표자료 프롬프트 복사</button></div></div>';
     return out;
   }
 
@@ -1151,6 +1237,7 @@
     var v = {};
     TFIELDS.forEach(function (f) { v[f.f] = take('T.' + f.f, c[f.f]); });
     if (submit && (!v.claim || !v.reason || !v.solution)) return toast('주장, 근거, 보완방안을 모두 채워 주세요');
+    if (submit && TFIELDS.some(function (f) { return !!tFieldProblem(f.f, v[f.f]); })) return toast('분홍색 칸을 더 자세히 작성해 주세요');
     var go = submit
       ? ask({ title: '제출할까요?', msg: '제출하면 더 이상 수정할 수 없어요.', ok: '제출하기' })
       : Promise.resolve(true);
@@ -1164,6 +1251,18 @@
   }
 
   var A = {
+    refreshPresence: function () {
+      if (!isTeacher()) return;
+      return DataStore.refreshPresence().then(function (list) {
+        S.presence = list; renderPresence(); toast('최근 접속 신호를 새로 확인했어요');
+      }).catch(function () { toast('접속 상태를 가져오지 못했어요. 인터넷 연결을 확인해 주세요.'); });
+    },
+    copyPresentationPrompt: function () {
+      var field = document.getElementById('presentation-prompt');
+      if (!field) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(field.value).then(function () { toast('프롬프트를 복사했어요. 개인정보를 확인해 주세요.'); }).catch(function () { toast('복사하지 못했어요. 글을 직접 선택해 복사해 주세요.'); });
+      toast('글을 직접 선택해 복사해 주세요.');
+    },
     tab: function (el) {
       S.tab = el.dataset.tab; S.flowStudent = null; S.editingQ = null;
       render();
@@ -1541,6 +1640,7 @@
     }
     var f = t.closest && t.closest('.cform');
     if (f) updateCommentButtons(f.parentNode);
+    if (t.closest && t.closest('.t-editor')) updateTValidation(document);
   });
 
   document.addEventListener('change', function (e) {

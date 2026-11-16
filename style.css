@@ -487,3 +487,18 @@ table.data tr.grp td { background: #FBF8F3; font-weight: 800; color: var(--muted
 /* N: 아직 I단계에서 정리하지 않은 줄 */
 .vrow.vwait { grid-template-columns: 44px 1fr; background: #FAFAF7; color: var(--muted); }
 .vwait-msg { padding-top: 4px; }
+/* 활동 안내와 학생이 직접 검색하는 검증 자료 */
+.phase-guide { margin: 12px 0 18px; padding: 15px 18px; border-radius: 12px; background: #3f3834; color: white; display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px 12px; line-height: 1.55; }
+.phase-guide b { color: #fff3cf; }
+.phase-guide span { flex: 1 1 65%; }
+.phase-guide small { display: block; flex-basis: 100%; color: #fbe6b2; }
+.source-links { margin: 14px 0; padding: 16px; border-radius: 12px; background: #eef5fb; border: 1px solid #c9ddf2; }
+.source-links p { margin: 5px 0 10px; font-size: .9em; }
+.source-links div { display: flex; flex-wrap: wrap; gap: 8px; }
+.source-links a { display: inline-block; background: white; border: 1px solid #9fbfdd; border-radius: 8px; padding: 8px 12px; color: #175889; text-decoration: none; font-weight: 700; }
+.source-links a:focus-visible { outline: 3px solid #295fab; outline-offset: 2px; }
+.t-editor textarea.needs-detail { background: #fff1f3; border-color: #d88395; }
+.t-editor .t-hint { display: block; margin: 3px 0 9px; color: #9a4558; }
+.presence-refresh { margin-left: 8px; }
+.presence-help { margin-left: 6px; opacity: .8; }
+.privacy-note { color: #76523b; background: #fff6e8; border-radius: 8px; padding: 10px; }
