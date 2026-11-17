@@ -97,7 +97,7 @@
   }
   function membersOf(g) {
     return S.d.students.filter(function (s) { return s.group === g; })
-      .sort(function (a, b) { return a.name.localeCompare(b.name, 'ko'); });
+      .sort(function (a, b) { return a.name.localeCompare(b.name, 'ko') || String(a.id).localeCompare(String(b.id)); });
   }
   function groupQs(g) { return S.d.questions.filter(function (q) { return q.group === g; }).sort(byTime); }
   // 검증표 행은 I단계 질문과 1:1 — 질문 순서대로, 질문마다 한 줄
@@ -905,7 +905,8 @@
     lines.push('모둠 중간 해결안: ' + (w.solution || '미작성'), '', '[N 검증]');
     rows.forEach(function (v) { lines.push((v.info || '정보 미작성') + ' / 판단: ' + (v.decision || '미작성') + ' / 근거: ' + (v.reason || '미작성')); });
     lines.push('우리 모둠의 아이디어: ' + (w.uniqueIdea || '미작성'));
-    if (!isTeacher()) lines.push('', '[내 K 최종 결과물]', (S.d.finalsById[me().id] || {}).text || '미작성');
+    lines.push('', '[K 모둠원별 최종 결과물]');
+    members.forEach(function (s) { lines.push(s.name + ': ' + ((S.d.finalsById[s.id] || {}).text || '미작성')); });
     lines.push('', '위 기록은 토의 중간 과정일 수 있습니다. 최종 합의가 기록되지 않았다면 임의로 확정하지 말고, 작성자가 확인할 수 있도록 표시해 주세요.');
     return lines.join('\n');
   }
@@ -942,10 +943,10 @@
       '<div class="btn-row"><button class="btn primary ph-K" data-act="saveFinal">성찰 저장</button></div>' +
       '</div></div>';
     out += section('K', '🎨 모둠 발표자료 만들기');
-    out += '<div class="card accent ph-K"><p>모둠 기록으로 A4 포스터를 만들어요. 복사해서 제미나이에 넣어주세요. 생성된 발표자료의 글과 과학적 내용을 확인해요.</p>' +
-      '<p class="privacy-note">제미나이에 붙여 넣으면 모둠원 이름과 작성 내용이 제미나이로 전송돼요. 이름 외에 연락처 등 개인정보가 들어 있지 않은지 확인해 주세요. 이 기기에서 확인 가능한 기록만 포함돼요.</p>' +
-      '<textarea id="presentation-prompt" data-d="presentation.prompt" rows="8" aria-label="발표자료 생성 프롬프트">' + esc(dv('presentation.prompt', presentationPrompt(myGroup()))) + '</textarea>' +
-      '<div class="btn-row"><button class="btn primary ph-K" data-act="copyPresentationPrompt">📋 복사해서 제미나이에 넣어주세요</button></div></div>';
+    out += '<div class="card accent ph-K"><p>모둠원 모두의 저장된 기록으로 A4 포스터 프롬프트를 만들어요. 먼저 <b>프롬프트 생성</b>을 누른 뒤 복사해서 제미나이에 넣어주세요. 기록을 바꾸었다면 저장 후 다시 생성해요.</p>' +
+      '<p class="privacy-note">제미나이에 붙여 넣으면 모둠원 이름과 작성 내용이 제미나이로 전송돼요. 이름 외에 연락처 등 개인정보가 들어 있지 않은지 확인해 주세요.</p>' +
+      '<textarea id="presentation-prompt" data-d="presentation.prompt" rows="8" aria-label="발표자료 생성 프롬프트" placeholder="프롬프트 생성 버튼을 눌러 주세요.">' + esc(dv('presentation.prompt', '')) + '</textarea>' +
+      '<div class="btn-row"><button class="btn primary ph-K" data-act="generatePresentationPrompt">✨ 프롬프트 생성</button> <button class="btn ph-K" data-act="copyPresentationPrompt">📋 복사해서 제미나이에 넣어주세요</button></div></div>';
     return out;
   }
 
@@ -1294,6 +1295,17 @@
   }
 
   var A = {
+    generatePresentationPrompt: function () {
+      var group = myGroup();
+      return loadAll().then(function (d) {
+        S.d = d;
+        return Promise.all(membersOf(group).map(function (student) { return DataStore.getServerDoc('finals', student.id); }));
+      }).then(function (finals) {
+        finals.forEach(function (f) { if (f) S.d.finalsById[f.id] = f; });
+        S.drafts['presentation.prompt'] = presentationPrompt(group);
+        toast('모둠의 저장된 기록으로 프롬프트를 만들었어요.');
+      }).catch(function () { toast('모둠 기록을 불러오지 못했어요. 인터넷 연결을 확인하고 다시 눌러 주세요.'); });
+    },
     uploadPoster: function () {
       if (isTeacher()) return;
       var input = document.getElementById('poster-file'), file = input && input.files[0], g = myGroup();
@@ -1311,6 +1323,7 @@
     copyPresentationPrompt: function () {
       var field = document.getElementById('presentation-prompt');
       if (!field) return;
+      if (!field.value.trim()) return toast('먼저 프롬프트 생성 버튼을 눌러 주세요.');
       if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(field.value).then(function () { toast('프롬프트를 복사했어요. 개인정보를 확인해 주세요.'); }).catch(function () { toast('복사하지 못했어요. 글을 직접 선택해 복사해 주세요.'); });
       toast('글을 직접 선택해 복사해 주세요.');
     },

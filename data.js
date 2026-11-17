@@ -125,6 +125,7 @@
         var d = read()[col];
         return Promise.resolve(d && d[id] ? Object.assign(clone(d[id]), { id: id }) : null);
       },
+      getServerDoc: function (col, id) { return this.getDoc(col, id); },
       listDocs: function (col, where) {
         var all = read()[col] || {};
         return Promise.resolve(Object.keys(all)
@@ -388,6 +389,10 @@
           var d = docsOf(col)[id];
           return d ? Object.assign(clone(d), { id: id }) : null;
         });
+      },
+      getServerDoc: function (col, id) {
+        return ready.then(function () { return colRef(col).doc(id).get({ source: 'server' }); })
+          .then(function (s) { return s.exists ? Object.assign(s.data(), { id: s.id }) : null; });
       },
       listDocs: function (col, where) {
         return ready.then(function () {
