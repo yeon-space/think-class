@@ -502,3 +502,16 @@ table.data tr.grp td { background: #FBF8F3; font-weight: 800; color: var(--muted
 .presence-refresh { margin-left: 8px; }
 .presence-help { margin-left: 6px; opacity: .8; }
 .privacy-note { color: #76523b; background: #fff6e8; border-radius: 8px; padding: 10px; }
+/* 발표자료 갤러리 */
+.gallery-heading h2 { margin-bottom: 4px; }
+.gallery-heading p { color: var(--muted); margin-top: 0; }
+.gallery-upload { margin: 18px 0; }
+.gallery-upload ol { line-height: 1.9; padding-left: 24px; }
+.gallery-upload input[type=file] { max-width: 100%; }
+.poster-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin: 22px 0; }
+.poster-card { background: #fff; border: 1px solid #eadfcf; border-radius: 16px; overflow: hidden; }
+.poster-card h3 { margin: 0; padding: 13px 16px; background: #f8f1e7; }
+.poster-card img { width: 100%; height: auto; display: block; }
+.poster-empty { aspect-ratio: 210 / 297; display: grid; place-items: center; color: #847b72; text-align: center; padding: 14px; }
+@media (max-width: 700px) { .poster-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }
+@media (max-width: 420px) { .poster-grid { grid-template-columns: 1fr; } }

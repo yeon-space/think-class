@@ -535,6 +535,7 @@
       return '<button class="tab ph-' + p.k + (S.tab === p.k ? ' active' : '') + (locked && S.tab !== p.k ? ' locked' : '') +
         '" data-act="tab" data-tab="' + p.k + '">' + (locked ? '🔒 ' : '') + p.k + ' · ' + p.short + '</button>';
     });
+    tabs.push('<button class="tab ph-K' + (S.tab === 'G' ? ' active' : '') + '" data-act="tab" data-tab="G">🖼️ 발표자료 갤러리</button>');
     tabs.push('<button class="tab ph-F' + (S.tab === 'F' ? ' active' : '') + '" data-act="tab" data-tab="F">🗺️ 전체 흐름</button>');
     if (isTeacher()) tabs.push('<button class="tab ph-A' + (S.tab === 'A' ? ' active' : '') + '" data-act="tab" data-tab="A">⚙️ 교사 관리</button>');
     return '<div class="tabs" role="tablist">' + tabs.join('') + '</div>';
@@ -549,6 +550,7 @@
       case 'I': return renderI();
       case 'N': return renderN();
       case 'K': return renderK();
+      case 'G': return renderGallery();
       case 'F': return renderFlowTab();
       case 'A': return renderAdmin();
     }
@@ -883,9 +885,9 @@
     var members = membersOf(g), w = gw(g), qs = groupQs(g), rows = groupVerify(g);
     var lines = [
       '중학교 3학년 과학 수업의 유전자 조작 토론 발표자료를 만들어 주세요.',
-      '형식: 가로 16:9, 한 장의 발표 슬라이드. 멀리서도 읽히는 큰 한글 글씨와 넉넉한 여백을 사용합니다.',
-      '색상: 크림색 배경과 주황·노랑·청록·파랑·보라 포인트. 과학과 대화에 어울리는 간결한 일러스트를 넣습니다.',
-      '구성: 주제, 모둠원들의 처음 의견, 토론·AI 검증에서 확인한 내용, 모둠의 최종 주장·근거·보완방안.',
+      '형식: A4 세로 비율(210×297mm)의 포스터 이미지 한 장. 인쇄하거나 화면에서 볼 수 있도록 크고 선명한 한글을 사용하세요.',
+      '디자인: 크림색 배경에 주황·노랑·청록·파랑·보라 포인트를 사용하고, 주제와 관련된 유전자·과학 그림이나 일러스트를 넣어 예쁜 포스터로 만드세요. 글과 그림이 겹치지 않도록 구획을 나누세요.',
+      '구성: 위쪽에 핵심 질문과 제목, 가운데에 처음 의견과 토론·AI 검증 결과, 아래쪽에 모둠의 최종 주장·근거·보완방안을 배치하세요. 내용을 빠뜨리지 않으면서 읽기 쉽게 정리하세요.',
       '의견이 달랐던 과정과 변화가 보이게 하되 자료에 없는 사실이나 합의는 만들지 마세요.',
       '정보가 없으면 ‘아직 작성하지 않음’으로 표시하고 학생 개인정보나 실명은 넣지 마세요.',
       '', '수업 주제: ' + (L().title || ''), '모둠: ' + g, '', '[T 처음 의견]'
@@ -938,11 +940,47 @@
       '<div class="btn-row"><button class="btn primary ph-K" data-act="saveFinal">성찰 저장</button></div>' +
       '</div></div>';
     out += section('K', '🎨 모둠 발표자료 만들기');
-    out += '<div class="card accent ph-K"><p>모둠 기록을 바탕으로 가로 한 장 발표자료를 만들 프롬프트예요. 복사해 Canva나 Gemini에 붙여 넣고 결과를 확인해요.</p>' +
+    out += '<div class="card accent ph-K"><p>모둠 기록으로 A4 포스터를 만들어요. 복사해서 제미나이에 넣어주세요. 생성된 발표자료의 글과 과학적 내용을 확인해요.</p>' +
       '<p class="privacy-note">외부 도구에 붙여 넣으면 내용이 해당 서비스로 전송돼요. 이름은 자동으로 빼지만, 글 속 개인정보가 남아 있는지 꼭 확인하고 지워 주세요. 이 기기에서 확인 가능한 기록만 포함돼요.</p>' +
       '<textarea id="presentation-prompt" data-d="presentation.prompt" rows="8" aria-label="발표자료 생성 프롬프트">' + esc(dv('presentation.prompt', presentationPrompt(myGroup()))) + '</textarea>' +
-      '<div class="btn-row"><button class="btn primary ph-K" data-act="copyPresentationPrompt">발표자료 프롬프트 복사</button></div></div>';
+      '<div class="btn-row"><button class="btn primary ph-K" data-act="copyPresentationPrompt">📋 복사해서 제미나이에 넣어주세요</button></div></div>';
     return out;
+  }
+
+  function renderGallery() {
+    var html = '<div class="gallery-heading"><h2>🖼️ 발표자료 갤러리</h2><p>우리 반 모둠들의 발표자료를 함께 살펴보아요.</p></div>';
+    if (!isTeacher()) html += '<div class="card gallery-upload"><h3>우리 모둠 발표자료 올리기</h3>' +
+      '<ol><li>제미나이에서 완성한 포스터를 이미지로 저장하거나 화면을 캡처해요.</li>' +
+      '<li>아래에서 사진을 선택하고 <b>발표자료 올리기</b>를 눌러요.</li>' +
+      '<li>갤러리에서 우리 모둠 사진을 확인해요. 다시 올리면 기존 사진이 바뀌어요.</li></ol>' +
+      '<label class="lbl" for="poster-file">발표자료 사진 선택 (JPG, PNG, WebP)</label>' +
+      '<input id="poster-file" type="file" accept="image/jpeg,image/png,image/webp">' +
+      '<div class="btn-row"><button class="btn primary ph-K" data-act="uploadPoster">발표자료 올리기</button></div></div>';
+    return html + '<div class="poster-grid">' + L().groups.map(function (g) {
+      var poster = gw(g).posterImage;
+      return '<article class="poster-card"><h3>' + esc(g) + '</h3>' +
+        (poster && /^data:image\/jpeg;base64,/.test(poster) ? '<img src="' + esc(poster) + '" alt="' + esc(g) + ' 발표자료">' : '<div class="poster-empty">아직 발표자료가 없어요</div>') + '</article>';
+    }).join('') + '</div>';
+  }
+
+  function preparePoster(file) {
+    return new Promise(function (resolve, reject) {
+      if (!file || !/^image\/(jpeg|png|webp)$/.test(file.type)) return reject(new Error('사진 파일을 선택해 주세요.'));
+      if (file.size > 15 * 1024 * 1024) return reject(new Error('15MB 이하의 사진을 선택해 주세요.'));
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('사진을 읽지 못했어요.')); };
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        var scale = Math.min(1, 1500 / Math.max(img.width, img.height));
+        var canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.round(img.width * scale)); canvas.height = Math.max(1, Math.round(img.height * scale));
+        var ctx = canvas.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        var quality = 0.85, result = canvas.toDataURL('image/jpeg', quality);
+        while (result.length > 450000 && quality > 0.3) { quality -= 0.1; result = canvas.toDataURL('image/jpeg', quality); }
+        if (result.length > 450000) return reject(new Error('사진이 너무 복잡해요. 더 작은 사진을 선택해 주세요.'));
+        resolve(result);
+      };
+      img.src = url;
+    });
   }
 
   /* ==================================================================
@@ -1254,6 +1292,14 @@
   }
 
   var A = {
+    uploadPoster: function () {
+      if (isTeacher()) return;
+      var input = document.getElementById('poster-file'), file = input && input.files[0], g = myGroup();
+      if (!file) return toast('먼저 발표자료 사진을 선택해 주세요.');
+      return preparePoster(file).then(function (image) {
+        return DataStore.setDoc('groupwork', g, { posterImage: image, posterUpdatedAt: Date.now() }, { merge: true });
+      }).then(function () { return done('발표자료를 올렸어요!'); }).catch(function (e) { toast(e.message || '사진을 올리지 못했어요. 인터넷 연결을 확인해 주세요.'); });
+    },
     refreshPresence: function () {
       if (!isTeacher()) return;
       return DataStore.refreshPresence().then(function (list) {
