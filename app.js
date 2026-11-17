@@ -889,7 +889,7 @@
       '디자인: 크림색을 바탕으로 주황·노랑·청록·파랑·보라를 조화롭게 사용하여 중학생이 만든 과학 발표 포스터처럼 완성도 있게 디자인하세요. 맨 위에는 주제가 한눈에 들어오는 크고 선명한 제목을 배치하세요.',
       '배경과 그림: 주제에 어울리는 유전자·과학 관련 그림과 일러스트를 포스터 배경에 넣어 주세요. 배경 그림은 은은하게 표현해 글을 가리지 않도록 하고, 필요하면 관련 그림을 내용 옆에도 배치하세요.',
       '가독성: 각 내용은 제목이 있는 밝은 색의 상자 안에 나누어 담고, 상자 사이 간격을 충분히 두세요. 글과 배경의 대비를 높이고 글자가 겹치거나 잘리지 않게, 멀리서도 읽을 수 있는 크고 선명한 한글로 작성하세요.',
-      '구성: 위쪽에 핵심 질문과 제목, 가운데에 처음 의견과 토론·AI 검증 결과, 아래쪽에 모둠의 최종 주장·근거·보완방안을 배치하세요. 내용을 빠뜨리지 않으면서 읽기 쉽게 정리하세요.',
+      '구성: 위쪽에 핵심 질문과 제목, 가운데에 처음 의견과 토론·AI 검증 결과, 아래쪽에 모둠의 결과와 모둠에서 산출한 방안을 배치하세요. 주어진 모둠 기록을 바탕으로 읽기 쉽게 정리하세요.',
       'AI 답변은 검증 전의 내용입니다. 포스터에는 N단계에서 수용하거나 수정한 내용과 판단 근거를 우선 사용하세요. N단계에서 제외하거나 수정한 잘못된 정보는 사실처럼 쓰지 마세요.',
       '의견이 달랐던 과정과 변화가 보이게 하되 자료에 없는 사실이나 합의는 만들지 마세요.',
       '정보가 없으면 ‘아직 작성하지 않음’으로 표시하고 제공된 모둠원 이름만 사용하세요. 이름 이외의 개인정보는 포스터에 넣지 마세요.',
@@ -903,11 +903,10 @@
     qs.forEach(function (q, i) { lines.push((i + 1) + '. ' + q.text); });
     lines.push('', '[I AI 답변 정리]');
     qs.forEach(function (q, i) { var a=S.d.aianswersById[q.id] || {}; lines.push((i + 1) + '. ' + (a.summary || '미작성')); });
-    lines.push('모둠 중간 해결안: ' + (w.solution || '미작성'), '', '[N 검증]');
+    lines.push('', '[N 검증]');
     rows.forEach(function (v) { lines.push((v.info || '정보 미작성') + ' / 판단: ' + (v.decision || '미작성') + ' / 근거: ' + (v.reason || '미작성')); });
-    lines.push('우리 모둠의 아이디어: ' + (w.uniqueIdea || '미작성'));
-    lines.push('', '[K 모둠원별 최종 결과물]');
-    members.forEach(function (s) { lines.push(s.name + ': ' + ((S.d.finalsById[s.id] || {}).text || '미작성')); });
+    lines.push('', '모둠의 결과 (I단계에서 저장한 중간 해결안): ' + (w.solution || '미작성'));
+    lines.push('모둠에서 산출한 방안 (N단계 우리 모둠만의 아이디어): ' + (w.uniqueIdea || '미작성'));
     return lines.join('\n');
   }
   function renderK() {
@@ -943,7 +942,7 @@
       '<div class="btn-row"><button class="btn primary ph-K" data-act="saveFinal">성찰 저장</button></div>' +
       '</div></div>';
     out += section('K', '🎨 모둠 발표자료 만들기');
-    out += '<div class="card accent ph-K"><p>모둠원 모두의 저장된 기록으로 A4 포스터 프롬프트를 만들어요. 먼저 <b>프롬프트 만들기</b>를 누른 뒤 복사해서 제미나이에 넣어주세요. 기록을 바꾸었다면 저장 후 다시 만들어요.</p>' +
+    out += '<div class="card accent ph-K"><p>모둠원들의 처음 의견과 모둠에서 함께 저장한 기록으로 A4 포스터 프롬프트를 만들어요. 먼저 <b>프롬프트 만들기</b>를 누른 뒤 복사해서 제미나이에 넣어주세요. 기록을 바꾸었다면 저장 후 다시 만들어요.</p>' +
       '<p class="privacy-note">제미나이에 붙여 넣으면 모둠원 이름과 작성 내용이 제미나이로 전송돼요. 이름 외에 연락처 등 개인정보가 들어 있지 않은지 확인해 주세요.</p>' +
       '<div class="btn-row"><button class="btn primary ph-K" data-act="generatePresentationPrompt">✨ 프롬프트 만들기</button></div>' +
       '<textarea id="presentation-prompt" data-d="presentation.prompt" rows="8" aria-label="발표자료 생성 프롬프트" placeholder="프롬프트 만들기 버튼을 눌러 주세요.">' + esc(dv('presentation.prompt', '')) + '</textarea>' +
@@ -1300,9 +1299,6 @@
       var group = myGroup();
       return loadAll().then(function (d) {
         S.d = d;
-        return Promise.all(membersOf(group).map(function (student) { return DataStore.getServerDoc('finals', student.id); }));
-      }).then(function (finals) {
-        finals.forEach(function (f) { if (f) S.d.finalsById[f.id] = f; });
         S.drafts['presentation.prompt'] = presentationPrompt(group);
         toast('모둠의 저장된 기록으로 프롬프트를 만들었어요.');
       }).catch(function () { toast('모둠 기록을 불러오지 못했어요. 인터넷 연결을 확인하고 다시 눌러 주세요.'); });
