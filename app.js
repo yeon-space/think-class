@@ -815,7 +815,8 @@
     var g = myGroup();
     var out = phaseHead('N', true);
     var qs = groupQs(g), byQ = verifyByQ(g);
-    out += '<div class="source-links"><b>🔎 믿을 만한 자료를 직접 찾아봐요</b><p>아래 사이트에서 검색한 뒤 자료의 작성 기관과 날짜도 확인해요.</p><div>' +
+    out += '<div class="source-links"><b>🔎 믿을 만한 자료를 직접 찾아봐요</b><p>교과서나 아래 버튼에 없는 자료도 찾아봐도 좋아요. 공신력 있는 자료를 사용하고, 작성 기관과 날짜를 확인해요.</p>' +
+      '<p class="source-warning"><strong>🚫 검증 자료를 찾을 때는 AI를 사용하지 않아요.</strong></p><div>' +
       '<a href="https://www.scienceall.com/" target="_blank" rel="noopener noreferrer">사이언스올 · 과학백과 ↗</a>' +
       '<a href="https://www.foodsafetykorea.go.kr/" target="_blank" rel="noopener noreferrer">식품안전나라 · 식품·GMO ↗</a>' +
       '<a href="https://www.nibr.go.kr/" target="_blank" rel="noopener noreferrer">국립생물자원관 · 생물·생태 ↗</a>' +
