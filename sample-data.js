@@ -383,7 +383,11 @@ window.SAMPLE_DATA = function () {
       }
       var a = {
         group: G, answer: answer, tool: TOOLS[(g + k) % TOOLS.length], hasSource: !!q[3], sourceNote: q[3],
-        summary: summary, updatedBy: sname(who), updatedAt: t(48 - g - k)
+        summary: summary,
+        accept: st.qa[k][2],
+        exclude: k === fq ? '확인되지 않은 과장된 부분을 그대로 받아들이지 않아요. ' + st.extra[2] : '자료와 맞지 않거나 근거가 부족한 단정적인 표현은 제외해요.',
+        uncertain: '사용한 자료의 작성 기관과 발표 시기를 확인하고, 장기적인 결과는 추가 자료를 찾아봐요.',
+        updatedBy: sname(who), updatedAt: t(48 - g - k)
       };
       a['c_' + who] = t(48 - g - k);
       data.aianswers[qid] = a;
@@ -395,6 +399,19 @@ window.SAMPLE_DATA = function () {
       solution: st.sol, solutionBy: sname(mem[2]), solutionAt: t(36 - g),
       uniqueIdea: st.idea, uniqueIdeaBy: sname(mem[0]), uniqueIdeaAt: t(20 - g)
     };
+    [0,1,2].forEach(function (k) {
+      var n = k + 1, work = data.groupwork[G];
+      work['mid' + n + '_plan'] = k === 0 ? st.sol : st.t[k][3];
+      work['mid' + n + '_reason'] = st.t[k][2];
+      work['mid' + n + '_support'] = st.qa[k][2];
+      work['rev' + n + '_plan'] = work['mid' + n + '_plan'];
+      work['rev' + n + '_reason'] = work['mid' + n + '_reason'];
+      work['rev' + n + '_support'] = work['mid' + n + '_support'];
+    });
+    data.groupwork[G].revision = [1,2,3].map(function (n) {
+      var work = data.groupwork[G];
+      return '방안 ' + n + ': ' + work['rev' + n + '_plan'] + '\n이유: ' + work['rev' + n + '_reason'] + '\n근거·사례·예시: ' + work['rev' + n + '_support'];
+    }).join('\n\n');
 
     /* N 검증표 : I단계 질문과 1:1 (질문 4개 → 4줄) */
     qids.forEach(function (qid, k) {
