@@ -28,8 +28,8 @@
     { v: '제외', icon: '❌', cls: 'exc' }
   ];
   var TFIELDS = [
-    { f: 'claim', label: '초기 주장', ph: '유전자 조작 기술은 인간에게 ○○이다. (나의 입장)' },
-    { f: 'reason', label: '근거', ph: '왜 그렇게 생각하나요? 알고 있는 사실이나 경험을 적어요.' },
+    { f: 'claim', label: '나의 주장', ph: '나의 입장을 선택해요.' },
+    { f: 'reason', label: '이유·근거·사례', ph: '왜 그렇게 생각하나요? 이유와 근거, 사례를 적어요.' },
     { f: 'solution', label: '보완방안', ph: '문제나 우려를 줄이고 더 나은 방향으로 활용하려면 어떻게 해야 할까요?' }
   ];
   var KFIELDS = [
@@ -191,11 +191,19 @@
     if (/^(그냥|모르겠|자료에\s*있어서|몰라|없음)[.!?\s]*$/.test(v)) return '생각한 이유를 더 자세히 적어 보세요.';
     return '';
   }
+  function tSavedStance(c) {
+    if (!c) return '';
+    if (c.stance === '축복' || c.stance === '재앙') return c.stance;
+    var claim = String(c.claim || ''), bless = claim.indexOf('축복') >= 0, disaster = claim.indexOf('재앙') >= 0;
+    return bless !== disaster ? (bless ? '축복' : '재앙') : '';
+  }
   function updateTValidation(root) {
     var panel = (root || document).querySelector('.t-editor');
     if (!panel) return;
-    var allValid = true;
-    TFIELDS.forEach(function (f) {
+    var allValid = !!panel.querySelector('[data-d="T.stance"]:checked');
+    var stanceHint = panel.querySelector('[data-t-hint="stance"]');
+    if (stanceHint) stanceHint.textContent = allValid ? '입장을 선택했어요.' : '축복 또는 재앙을 선택해 주세요.';
+    TFIELDS.filter(function (f) { return f.f !== 'claim'; }).forEach(function (f) {
       var input = panel.querySelector('[data-d="T.' + f.f + '"]');
       var hint = panel.querySelector('[data-t-hint="' + f.f + '"]');
       if (!input) return;
@@ -577,7 +585,7 @@
     }
     var lockNote = (isTeacher() && !isOpen(k)) ? ' <span class="status">🔒 학생에게 잠김</span>' : '';
     var guides = {
-      T:'자료를 읽고 나의 주장, 근거와 보완방안을 적은 뒤 제출해요.',
+      T:'자료를 읽고 나의 입장, 이유·근거·사례와 보완방안을 적은 뒤 제출해요.',
       H:'친구의 생각을 읽고 댓글을 나누며 AI에게 물어볼 질문을 만들어요.',
       I:'내 질문의 AI 답변을 기록하고, 믿을 만한 자료로 답변을 검토한 뒤 모둠 해결안을 작성해요.',
       N:'다른 모둠에 의견을 남기고 받은 의견을 살펴 우리 모둠 해결안을 수정해요.',
@@ -595,6 +603,7 @@
       '<h2>' + p.icon + ' ' + p.title + lockNote + '</h2>' + enName(p) +
       ((k !== 'I' && k !== 'N' && L().prompts[k]) ? '<p class="q">' + nl(L().prompts[k]) + '</p>' : '') +
       '</div>' + pick + '</div>' +
+      ((k === 'I' || k === 'N') ? '<div class="notice tablet-guide ph-' + k + '"><b>📱 모둠에서 태블릿 한 대만 사용하고 나머지 태블릿은 덮어 두세요.</b>' + (k === 'I' ? '<br><small>질문마다 작성한 학생의 이름으로 입장해 기록해요.</small>' : '') + '</div>' : '') +
       '<div class="phase-guide ph-' + k + '"><b>이 단계에서 할 일</b><span>' + guides[k] + '</span>' +
       (pending ? '<small>' + pending + '</small>' : '') + '</div>';
   }
@@ -693,8 +702,12 @@
         '<div class="notice info" style="margin:16px 0 0">제출한 카드는 수정할 수 없어요. 이 생각은 K단계에서 지금의 생각과 비교하게 돼요.</div></div>';
     } else {
       out += '<div class="card accent ph-T t-editor">' +
-        TFIELDS.map(function (f) {
-          return '<label class="lbl">' + f.label + '</label>' + ta('T.' + f.f, c && c[f.f], f.ph, f.f === 'claim' ? 2 : 4) + '<small class="t-hint" data-t-hint="' + f.f + '"></small>';
+        '<label class="lbl">나의 주장</label><div class="k-stance"><b>유전자 조작기술은 인간에게</b> <span class="decisions">' + ['축복', '재앙'].map(function (choice) {
+          return '<label class="dec k-choice ' + (choice === '축복' ? 'k-blessing' : 'k-disaster') + '"><input type="radio" name="tstance" data-d="T.stance" value="' + choice + '"' + (dv('T.stance', tSavedStance(c)) === choice ? ' checked' : '') + '><span>' + choice + '</span></label>';
+        }).join(' <span>/</span> ') + '</span> <b>이다.</b> <small class="k-stance-help">(자신의 의견에 해당하는 단어를 클릭하세요)</small></div><small class="t-hint" data-t-hint="stance"></small>' +
+        (c && c.claim && !c.stance && !tSavedStance(c) ? '<div class="notice info">이전에 작성한 주장: ' + nl(c.claim) + '<br>계속 작성하려면 위에서 입장을 선택해 주세요.</div>' : '') +
+        TFIELDS.filter(function (f) { return f.f !== 'claim'; }).map(function (f) {
+          return '<label class="lbl">' + f.label + '</label>' + ta('T.' + f.f, c && c[f.f], f.ph, 4) + '<small class="t-hint" data-t-hint="' + f.f + '"></small>';
         }).join('') +
         '<div class="btn-row"><button class="btn primary ph-T" data-act="submitT" disabled>제출하기</button>' +
         '<button class="btn" data-act="saveTDraft">임시 저장</button>' +
@@ -961,7 +974,7 @@
       '', '수업 주제: ' + (L().title || ''), '모둠: ' + g, '', '[T 처음 의견]');
     members.forEach(function (s, i) {
       var c = S.d.tcardsById[s.id] || {};
-      lines.push(s.name + ': 주장 ' + (c.claim || '미작성') + ' / 근거 ' + (c.reason || '미작성') + ' / 보완방안 ' + (c.solution || '미작성'));
+      lines.push(s.name + ': 주장 ' + (c.claim || '미작성') + ' / 이유·근거·사례 ' + (c.reason || '미작성') + ' / 보완방안 ' + (c.solution || '미작성'));
     });
     lines.push('', '[질문별 우리 말 답변과 검증 결과]');
     qs.forEach(function (q, i) {
@@ -1347,10 +1360,11 @@
   function saveT(submit) {
     var c = S.d.tcardsById[me().id] || {};
     if (c.submitted) return toast('이미 제출한 카드예요');
-    var v = {};
-    TFIELDS.forEach(function (f) { v[f.f] = take('T.' + f.f, c[f.f]); });
-    if (submit && (!v.claim || !v.reason || !v.solution)) return toast('주장, 근거, 보완방안을 모두 채워 주세요');
-    if (submit && TFIELDS.some(function (f) { return !!tFieldProblem(f.f, v[f.f]); })) return toast('분홍색 칸을 더 자세히 작성해 주세요');
+    var stance = take('T.stance', tSavedStance(c));
+    var v = { stance: stance, claim: stance ? '유전자 조작기술은 인간에게 ' + stance + '이다.' : (c.claim || ''), reason: take('T.reason', c.reason), solution: take('T.solution', c.solution) };
+    if (c.claim && c.claim !== v.claim && !c.legacyClaim) v.legacyClaim = c.claim;
+    if (submit && (!stance || !v.reason || !v.solution)) return toast('입장, 이유·근거·사례, 보완방안을 모두 채워 주세요');
+    if (submit && ['reason', 'solution'].some(function (f) { return !!tFieldProblem(f, v[f]); })) return toast('분홍색 칸을 더 자세히 작성해 주세요');
     var go = submit
       ? ask({ title: '제출할까요?', msg: '제출하면 더 이상 수정할 수 없어요.', ok: '제출하기' })
       : Promise.resolve(true);
@@ -1708,7 +1722,7 @@
       });
     },
     exportCSV: function () {
-      var header = ['모둠', '이름', 'T 초기 주장', 'T 근거', 'T 보완방안', 'T 제출', 'H 모둠 AI 질문', 'H 쓴 댓글 수', 'H 받은 댓글 수',
+      var header = ['모둠', '이름', 'T 나의 주장', 'T 이유·근거·사례', 'T 보완방안', 'T 제출', 'H 모둠 AI 질문', 'H 쓴 댓글 수', 'H 받은 댓글 수',
         'I AI 답변 기록(도구/출처/우리 말 정리)', 'I 모둠 중간 해결안', 'I AI 답변 검토', 'N 모둠 수정안',
         'K 최종 결과물'].concat(KFIELDS.map(function (x) { return 'K ' + x.label; }));
       var rows = [header];

@@ -502,6 +502,7 @@ table.data tr.grp td { background: #FBF8F3; font-weight: 800; color: var(--muted
 .poster-steps { padding-left: 24px; line-height: 1.9; }
 .k-stance { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; line-height: 1.8; }
 .k-stance-help { color: #6e6179; }
+.tablet-guide { background: var(--cs); border: 1px solid var(--c); color: #3b3731; line-height: 1.7; }
 .compare .k-compare-left { display: grid; gap: 14px; position: sticky; top: 12px; }
 .compare .k-compare-left .mine { position: static; }
 .k-final-reference { background: var(--k-soft); border: 2px solid #d2bce6; border-radius: var(--radius); padding: 20px; overflow-wrap: anywhere; }
