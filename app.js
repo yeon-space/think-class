@@ -926,6 +926,16 @@
     ['stance','reason1','evidence1','reason2','evidence2','reason3','evidence3'].forEach(function (key) { result[key] = example[key] || ''; });
     return result;
   }
+  function kFinalSummary(f) {
+    var stance = dv('K.stance', f.stance || ''), parts = [];
+    if (stance) parts.push('<dt>나의 입장</dt><dd>유전자 조작기술은 인간에게 ' + esc(stance) + '이다.</dd>');
+    [1,2,3].forEach(function (i) {
+      var reason = dv('K.reason' + i, f['reason' + i] || ''), evidence = dv('K.evidence' + i, f['evidence' + i] || '');
+      if (String(reason).trim()) parts.push('<dt>이유 ' + i + '</dt><dd>' + nl(reason) + '</dd>');
+      if (String(evidence).trim()) parts.push('<dt>근거·사례 ' + i + '</dt><dd>' + nl(evidence) + '</dd>');
+    });
+    return parts.length ? '<dl class="tfields" style="--t:var(--k)">' + parts.join('') + '</dl>' : '<div class="empty">위에서 최종 결과물을 작성하면 여기에 보여요.</div>';
+  }
   function presentationPrompt(g) {
     var members = membersOf(g), w = gw(g), qs = groupQs(g), rows = groupVerify(g);
     var lines = [
@@ -992,7 +1002,7 @@
       '<div class="card accent ph-K">' +
       '<p><b>나의 입장을 선택해요.</b></p><div class="k-stance"><b>유전자 조작기술은 인간에게</b> <span class="decisions">' + ['축복', '재앙'].map(function (choice) {
         return '<label class="dec k-choice ' + (choice === '축복' ? 'k-blessing' : 'k-disaster') + '"><input type="radio" name="kstance" data-d="K.stance" value="' + choice + '"' + (dv('K.stance', f.stance) === choice ? ' checked' : '') + '><span>' + choice + '</span></label>';
-      }).join(' <span>/</span> ') + '</span> <b>이다.</b></div>' +
+      }).join(' <span>/</span> ') + '</span> <b>이다.</b> <small class="k-stance-help">(자신의 의견에 해당하는 단어를 클릭하세요)</small></div>' +
       '<p class="meta">이유와 그 이유를 뒷받침하는 근거나 사례를 짝지어 적어요. 최대 3가지까지 작성할 수 있어요.</p>' +
       [1, 2, 3].map(function (i) { return '<div class="k-reason"><label class="lbl">이유 ' + i + '</label>' + ta('K.reason' + i, f['reason' + i], '~하기 때문이다.', 2) + '<label class="lbl">이유 ' + i + '의 근거·사례·예시</label>' + ta('K.evidence' + i, f['evidence' + i], '이유를 뒷받침하는 근거나 사례를 적어요.', 3) + '</div>'; }).join('') +
       '<div class="btn-row"><button class="btn primary ph-K" data-act="saveFinal">저장</button>' +
@@ -1000,7 +1010,8 @@
       '</div>';
 
     out += section('K', '🪞 성찰 — 처음 생각과 비교해요');
-    out += '<div class="compare">' + myTBox(S.d.tcardsById[me().id]) +
+    out += '<div class="compare"><div class="k-compare-left">' + myTBox(S.d.tcardsById[me().id]) +
+      '<div class="k-final-reference"><h3>🌱 나의 최종 결과물 · K</h3><div data-k-final-preview>' + kFinalSummary(f) + '</div></div></div>' +
       '<div class="card accent ph-K">' +
       KFIELDS.map(function (x) { return '<label class="lbl">' + x.label + '</label>' + ta('K.' + x.f, f[x.f], x.ph, 4); }).join('') +
       '<div class="btn-row"><button class="btn primary ph-K" data-act="saveFinal">성찰 저장</button></div>' +
@@ -1775,6 +1786,10 @@
     if (t.dataset && t.dataset.cf) {
       var p = t.dataset.cf.split('.');
       if (S.cfEdit[p[0]]) S.cfEdit[p[0]][+p[1]] = t.value;
+    }
+    if (t.dataset && /^K\.(stance|reason[1-3]|evidence[1-3])$/.test(t.dataset.d || '') && S.user && S.d) {
+      var preview = document.querySelector('[data-k-final-preview]');
+      if (preview) preview.innerHTML = kFinalSummary(finalForEditor(me().id));
     }
     var f = t.closest && t.closest('.cform');
     if (f) updateCommentButtons(f.parentNode);
