@@ -21,7 +21,7 @@
   PHASES.forEach(function (p) { PH[p.k] = p; });
   var PK = PHASES.map(function (p) { return p.k; });
   var COMMENT_PHASES = ['H'];
-  var GROUP_COMMENT_FIELDS = ['👍 이 방안이 좋은 이유', '💡 추가하면 좋을 요소', '🔍 한 번 더 살펴봐야 하는 부분 (사실·과학적 오류)'];
+  var GROUP_COMMENT_FIELDS = ['⭕ 수용할 부분', '❌ 제외할 부분', '❓ 검증이 되지 않은 부분'];
   var DECISIONS = [
     { v: '수용', icon: '✅', cls: 'acc' },
     { v: '수정', icon: '✏️', cls: 'mod' },
@@ -644,9 +644,12 @@
   function commentsBlock(phase, tt, tid, canWrite, title) {
     var list = commentsOn(phase, tt, tid);
     var limited = phase === 'H', full = limited && list.length >= MAX_H_COMMENTS;
+    var current = phase === 'N' ? list.filter(function (c) { return (c.fields || []).length === 3 && c.fields.every(function (f, i) { return f.label === GROUP_COMMENT_FIELDS[i]; }); }) : list;
+    var older = phase === 'N' ? list.filter(function (c) { return current.indexOf(c) < 0; }) : [];
     return '<div class="comments">' +
       '<div class="ctitle">' + (title || '댓글') + ' ' + list.length + (limited ? '/' + MAX_H_COMMENTS : '') + '개</div>' +
-      list.map(commentTable).join('') +
+      current.map(commentTable).join('') +
+      (older.length ? '<details class="legacy-comments"><summary>이전에 남긴 댓글 보기 (' + older.length + '개)</summary><small>이전 댓글은 작성 당시의 항목명으로 보존돼요.</small>' + older.map(commentTable).join('') + '</details>' : '') +
       (full ? '<div class="clock">🔒 댓글 ' + MAX_H_COMMENTS + '개가 모두 찼어요. 아직 댓글이 적은 다른 친구 카드에 남겨 주세요.</div>'
             : (canWrite ? commentForm(phase, tt, tid) : '')) +
       '</div>';
@@ -767,10 +770,20 @@
       return L().groups.filter(function (name) { return new RegExp('^' + x + '모둠(?:\\D|$)').test(name); })[0];
     }).filter(function (x) { return x && x !== g; });
   }
-  var PLAN_FIELDS = [{key:'plan',label:'방안'}, {key:'reason',label:'이유'}, {key:'evidence',label:'근거'}, {key:'example',label:'사례'}];
+  var PLAN_FIELDS = [{key:'plan',label:'방안'}, {key:'reason',label:'이유'}, {key:'support',label:'근거·사례·예시'}];
+  function planFieldLabel(f, n) {
+    return f.key === 'plan' ? '방안 ' + n : f.key === 'reason' ? '이유 ' + n : '이유 ' + n + '의 근거·사례·예시';
+  }
   function planField(w, kind, n, key) {
     var value = w[kind + n + '_' + key];
     if (value != null) return value;
+    if (key === 'support') {
+      var old = [{key:'evidence',label:'근거'}, {key:'example',label:'사례'}].map(function (part) {
+        var text = w[kind + n + '_' + part.key];
+        return text ? part.label + ': ' + text : '';
+      }).filter(Boolean).join('\n');
+      if (old) return old;
+    }
     if (kind === 'rev') return planField(w, 'mid', n, key);
     return n === 1 && key === 'plan' ? (w.solution || '') : '';
   }
@@ -778,7 +791,7 @@
     var prefix = (kind === 'mid' ? 'sol.' : 'rev.') + g;
     return [1,2,3].map(function (n) {
       return '<div class="plan-block"><h3>방안 ' + n + '</h3>' + PLAN_FIELDS.map(function (f) {
-        return '<label class="lbl">' + f.label + '</label>' + ta(prefix + '.' + n + '_' + f.key, planField(w, kind, n, f.key), f.label + '을(를) 적어요.', 2);
+        return '<label class="lbl">' + planFieldLabel(f, n) + '</label>' + ta(prefix + '.' + n + '_' + f.key, planField(w, kind, n, f.key), f.label + '을(를) 적어요.', 2);
       }).join('') + '</div>';
     }).join('');
   }
@@ -793,6 +806,18 @@
       if (parts.length) lines.push('방안 ' + n + '\n' + parts.join('\n'));
     });
     return { data:data, text:lines.join('\n\n') };
+  }
+  function revisionEditor(g, w) {
+    var prefix = 'rev.' + g;
+    return '<div class="revision-headings"><b>I단계 원래 의견</b><span></span><b>N단계 모둠 수정안</b></div>' +
+      [1,2,3].map(function (n) {
+        return '<div class="revision-plan"><h3>방안 ' + n + '</h3>' + PLAN_FIELDS.map(function (f) {
+          var old = planField(w, 'mid', n, f.key);
+          return '<div class="revision-field"><div><label class="lbl">' + planFieldLabel(f, n) + '</label><div class="revision-original">' + orDash(old) + '</div></div>' +
+            '<span class="revision-arrow" aria-hidden="true">→</span><div><label class="lbl">' + planFieldLabel(f, n) + '</label>' +
+            ta(prefix + '.' + n + '_' + f.key, planField(w, 'rev', n, f.key), f.label + '을(를) 수정해요.', 3) + '</div></div>';
+        }).join('') + '</div>';
+      }).join('');
   }
   function renderI() {
     var g = myGroup();
@@ -819,7 +844,7 @@
         out += '<div class="card accent ph-I"><div class="ai-q"><span class="qn">Q' + (i + 1) + '</span><span>' + esc(q.text) + '</span></div>' +
           '<p class="meta">질문을 작성한 학생이 기록해요. 다른 모둠원은 확인할 수 있어요.</p>' +
           '<dl class="tfields"><dt>AI 답변</dt><dd>' + orDash(a.answer) + '</dd><dt>사용한 AI·출처</dt><dd>' + orDash([a.tool, a.sourceNote].filter(Boolean).join(' · ')) + '</dd>' +
-          '<dt>우리 말로 정리</dt><dd>' + orDash(a.summary) + '</dd><dt>수용할 부분</dt><dd>' + orDash(a.accept) + '</dd><dt>제외할 부분</dt><dd>' + orDash(a.exclude) + '</dd><dt>검증되지 않은 부분</dt><dd>' + orDash(a.uncertain) + '</dd></dl></div>';
+          '<dt>우리 말로 정리</dt><dd>' + orDash(a.summary) + '</dd><dt>⭕ 수용할 부분</dt><dd>' + orDash(a.accept) + '</dd><dt>❌ 제외할 부분</dt><dd>' + orDash(a.exclude) + '</dd><dt>❓ 검증이 되지 않은 부분</dt><dd>' + orDash(a.uncertain) + '</dd></dl></div>';
         return;
       }
       out += '<div class="card accent ph-I">' +
@@ -833,9 +858,9 @@
         conflictBox(k) +
         '<label class="lbl">우리 말로 정리 <small>어려운 말은 쉽게, 중요한 것만 골라서</small></label>' + ta(k + '.summary', a.summary, 'AI 답변을 우리 모둠의 말로 다시 써요.', 3) +
         '<h3>🔍 AI 답변 검토하기</h3><p class="meta">교과서나 공신력 있는 자료를 직접 찾아 확인해요. 검토 자료를 찾을 때는 AI를 사용하지 않아요.</p>' +
-        '<table class="ctable ai-review"><tbody><tr><th>수용할 부분</th><td>' + ta(k + '.accept', a.accept, '확인하여 받아들일 수 있는 내용을 적어요.', 3) + '</td></tr>' +
-        '<tr><th>제외할 부분</th><td>' + ta(k + '.exclude', a.exclude, '틀리거나 맞지 않아 제외할 내용을 적어요.', 3) + '</td></tr>' +
-        '<tr><th>검증이 되지 않은 부분</th><td>' + ta(k + '.uncertain', a.uncertain, '아직 믿을 만한 근거를 찾지 못한 내용을 적어요.', 3) + '</td></tr></tbody></table>' +
+        '<table class="ctable ai-review"><tbody><tr><th><span class="review-icon review-ok">O</span> 수용할 부분</th><td>' + ta(k + '.accept', a.accept, '확인하여 받아들일 수 있는 내용을 적어요.', 3) + '</td></tr>' +
+        '<tr><th><span class="review-icon review-no">X</span> 제외할 부분</th><td>' + ta(k + '.exclude', a.exclude, '틀리거나 맞지 않아 제외할 내용을 적어요.', 3) + '</td></tr>' +
+        '<tr><th><span class="review-icon review-unknown">?</span> 검증이 되지 않은 부분</th><td>' + ta(k + '.uncertain', a.uncertain, '아직 믿을 만한 근거를 찾지 못한 내용을 적어요.', 3) + '</td></tr></tbody></table>' +
         '<div class="btn-row"><button class="btn primary ph-I" data-act="saveAI" data-id="' + q.id + '">저장</button>' +
         (a.updatedAt ? '<span class="meta">마지막 저장: ' + esc(a.updatedBy || '') + ' · ' + fmt(a.updatedAt) + '</span>' : '') + '</div>' +
         '</div>';
@@ -858,8 +883,9 @@
    * ================================================================== */
   function renderN() {
     var g = myGroup(), w = gw(g), out = phaseHead('N', true), assigned = assignedGroups(g);
-    out += section('N', '💬 다른 모둠의 중간 해결안', '<small>' + esc(assigned.join(', ')) + '에 모둠과 상의하여 댓글을 남겨요.</small>');
-    if (w.solution) out += '<div class="card accent ph-N"><h3>우리 모둠이 받은 댓글</h3>' + commentsBlock('N', 'solution', g, false, '다른 모둠이 남긴 댓글') + '</div>';
+    out += section('N', '💬 모둠끼리 의견을 나눠요 (모둠 피드백)', '<small>' + esc(assigned.join(', ')) + '에 모둠과 상의하여 댓글을 남겨요.</small>');
+    out += '<div class="card accent ph-N"><h3>우리 모둠의 중간 해결안 · I단계</h3><div class="result-text ph-I">' + orDash(w.solution) + '</div>' +
+      '<h3>우리 모둠이 받은 댓글</h3>' + commentsBlock('N', 'solution', g, false, '다른 모둠이 남긴 댓글') + '</div>';
     var others = assigned.concat(L().groups.filter(function (x) { return x !== g && assigned.indexOf(x) < 0; }));
     out += '<div class="grid2">' + others.map(function (og) {
       var ow = gw(og), chosen = assigned.indexOf(og) >= 0;
@@ -871,10 +897,8 @@
     }).join('') + '</div>';
     out += section('N', '🔄 친구들의 의견 보고 우리 의견 수정하기');
     out += '<div class="notice info">I단계의 원래 방안은 그대로 보존돼요. 모둠이 상의한 수정안을 오른쪽에 함께 적어 주세요.</div>' +
-      '<div class="revision-layout"><div class="card"><h3>I단계 원래 의견</h3><div class="result-text ph-I">' + orDash(w.solution) + '</div></div>' +
-      '<div class="revision-arrow" aria-hidden="true">→</div><div class="card accent ph-N"><h3>N단계 모둠 수정안</h3>' + conflictBox('rev.' + g) + planEditor(g, 'rev', w) +
-      '<div class="btn-row"><button class="btn primary ph-N" data-act="saveRevision">모둠 수정안 저장</button>' + (w.revisionAt ? '<span class="meta">마지막 저장: ' + esc(w.revisionBy || '') + ' · ' + fmt(w.revisionAt) + '</span>' : '') + '</div></div></div>';
-    if (w.uniqueIdea) out += '<div class="card"><h3>기존에 저장한 우리 모둠 아이디어</h3>' + nl(w.uniqueIdea) + '</div>';
+      '<div class="card accent ph-N">' + conflictBox('rev.' + g) + revisionEditor(g, w) +
+      '<div class="btn-row"><button class="btn primary ph-N" data-act="saveRevision">모둠 수정안 저장</button>' + (w.revisionAt ? '<span class="meta">마지막 저장: ' + esc(w.revisionBy || '') + ' · ' + fmt(w.revisionAt) + '</span>' : '') + '</div></div>';
     return out;
   }
 
@@ -962,7 +986,7 @@
         return '<label class="dec"><input type="radio" name="kstance" data-d="K.stance" value="' + choice + '"' + (dv('K.stance', f.stance) === choice ? ' checked' : '') + '><span>' + choice + '</span></label>';
       }).join(' <span>/</span> ') + '</span> <b>이다.</b></div>' +
       '<p class="meta">이유와 그 이유를 뒷받침하는 근거나 사례를 짝지어 적어요. 최대 3가지까지 작성할 수 있어요.</p>' +
-      [1, 2, 3].map(function (i) { return '<div class="k-reason"><label class="lbl">이유 ' + i + '</label>' + ta('K.reason' + i, f['reason' + i], '~하기 때문이다.', 2) + '<label class="lbl">이유 ' + i + '의 근거·예시·사례</label>' + ta('K.evidence' + i, f['evidence' + i], '이유를 뒷받침하는 근거나 사례를 적어요.', 3) + '</div>'; }).join('') +
+      [1, 2, 3].map(function (i) { return '<div class="k-reason"><label class="lbl">이유 ' + i + '</label>' + ta('K.reason' + i, f['reason' + i], '~하기 때문이다.', 2) + '<label class="lbl">이유 ' + i + '의 근거·사례·예시</label>' + ta('K.evidence' + i, f['evidence' + i], '이유를 뒷받침하는 근거나 사례를 적어요.', 3) + '</div>'; }).join('') +
       '<div class="btn-row"><button class="btn primary ph-K" data-act="saveFinal">저장</button>' +
       (f.updatedAt ? '<span class="meta">마지막 저장 ' + fmt(f.updatedAt) + '</span>' : '') + '</div>' +
       '</div>';

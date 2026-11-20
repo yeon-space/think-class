@@ -460,9 +460,9 @@ window.SAMPLE_DATA = function () {
         phase: 'N', targetType: 'solution', targetId: GROUPS[tg], targetGroup: GROUPS[tg],
         authorId: author, authorName: sname(author), authorGroup: GROUPS[g], createdAt: t(33 - g - j),
         fields: [
-          { label: '👍 이 방안이 좋은 이유', value: '문제의 이점과 우려를 함께 살펴보고 실천할 방향을 제시해서 좋아.' },
-          { label: '💡 추가하면 좋을 요소', value: ['시행할 때 누가 참여하고 어떤 기준으로 결정할지 더 구체적으로 적으면 좋겠어.', '방안을 적용한 뒤 생기는 변화를 어떻게 점검할지 구체적으로 적으면 좋겠어.'][(g + j) % 2] },
-          { label: '🔍 한 번 더 살펴봐야 하는 부분 (사실·과학적 오류)', value: '방안에 들어간 과학적 사실과 효과를 믿을 만한 자료로 다시 확인하면 좋겠어.' }
+          { label: '⭕ 수용할 부분', value: '문제의 이점과 우려를 함께 살펴보고 실천 방향을 정한 점을 수용할 수 있어.' },
+          { label: '❌ 제외할 부분', value: '근거가 확인되지 않은 내용을 단정하는 표현은 제외하면 좋겠어.' },
+          { label: '❓ 검증이 되지 않은 부분', value: '방안을 시행했을 때 예상한 효과가 실제로 나타나는지는 자료를 더 찾아봐야 해.' }
         ]
       });
     });
