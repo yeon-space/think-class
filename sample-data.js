@@ -402,15 +402,13 @@ window.SAMPLE_DATA = function () {
     [0,1,2].forEach(function (k) {
       var n = k + 1, work = data.groupwork[G];
       work['mid' + n + '_plan'] = k === 0 ? st.sol : st.t[k][3];
-      work['mid' + n + '_reason'] = st.t[k][2];
-      work['mid' + n + '_support'] = st.qa[k][2];
+      work['mid' + n + '_basis'] = st.t[k][2] + '\n근거·사례: ' + st.qa[k][2];
       work['rev' + n + '_plan'] = work['mid' + n + '_plan'];
-      work['rev' + n + '_reason'] = work['mid' + n + '_reason'];
-      work['rev' + n + '_support'] = work['mid' + n + '_support'];
+      work['rev' + n + '_basis'] = work['mid' + n + '_basis'];
     });
     data.groupwork[G].revision = [1,2,3].map(function (n) {
       var work = data.groupwork[G];
-      return '방안 ' + n + ': ' + work['rev' + n + '_plan'] + '\n이유: ' + work['rev' + n + '_reason'] + '\n근거·사례·예시: ' + work['rev' + n + '_support'];
+      return '방안 ' + n + ': ' + work['rev' + n + '_plan'] + '\n근거·사례·예시: ' + work['rev' + n + '_basis'];
     }).join('\n\n');
 
     /* N 검증표 : I단계 질문과 1:1 (질문 4개 → 4줄) */
@@ -477,9 +475,9 @@ window.SAMPLE_DATA = function () {
         phase: 'N', targetType: 'solution', targetId: GROUPS[tg], targetGroup: GROUPS[tg],
         authorId: author, authorName: sname(author), authorGroup: GROUPS[g], createdAt: t(33 - g - j),
         fields: [
-          { label: '⭕ 수용할 부분', value: '문제의 이점과 우려를 함께 살펴보고 실천 방향을 정한 점을 수용할 수 있어.' },
-          { label: '❌ 제외할 부분', value: '근거가 확인되지 않은 내용을 단정하는 표현은 제외하면 좋겠어.' },
-          { label: '❓ 검증이 되지 않은 부분', value: '방안을 시행했을 때 예상한 효과가 실제로 나타나는지는 자료를 더 찾아봐야 해.' }
+          { label: '👍 좋은 점', value: '문제의 이점과 우려를 함께 살펴보고 실천할 방향을 제시한 점이 좋아.' },
+          { label: '💭 아쉬운 점', value: '방안을 시행할 때 누가 참여하고 무엇을 먼저 할지 좀 더 구체적이면 좋겠어.' },
+          { label: '🔍 사실 확인이 필요한 부분', value: '이 방안을 시행했을 때 예상한 효과가 나타나는지 믿을 만한 자료로 확인해 보자.' }
         ]
       });
     });

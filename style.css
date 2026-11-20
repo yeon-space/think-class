@@ -502,6 +502,9 @@ table.data tr.grp td { background: #FBF8F3; font-weight: 800; color: var(--muted
 .poster-steps { padding-left: 24px; line-height: 1.9; }
 .k-stance { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; line-height: 1.8; }
 .k-stance .decisions { flex-direction: row; align-items: center; }
+.k-choice span { min-width: 82px; padding: 0 16px; }
+.k-blessing input:checked + span { background: #d6efdb; border-color: #318653; color: #175b34; }
+.k-disaster input:checked + span { background: #fbe0e9; border-color: #ca668b; color: #8b2850; }
 .k-reference-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
 .k-reference { padding: 16px; border-radius: 14px; border: 1px solid; }
 .k-reference h3 { margin: 0 0 10px; }

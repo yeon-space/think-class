@@ -21,7 +21,7 @@
   PHASES.forEach(function (p) { PH[p.k] = p; });
   var PK = PHASES.map(function (p) { return p.k; });
   var COMMENT_PHASES = ['H'];
-  var GROUP_COMMENT_FIELDS = ['⭕ 수용할 부분', '❌ 제외할 부분', '❓ 검증이 되지 않은 부분'];
+  var GROUP_COMMENT_FIELDS = ['👍 좋은 점', '💭 아쉬운 점', '🔍 사실 확인이 필요한 부분'];
   var DECISIONS = [
     { v: '수용', icon: '✅', cls: 'acc' },
     { v: '수정', icon: '✏️', cls: 'mod' },
@@ -177,8 +177,7 @@
   function gw(g) { return S.d.groupworkById[g] || {}; }
   function commentsOn(phase, tt, tid) {
     return S.d.comments.filter(function (c) {
-      return c.phase === phase && c.targetType === tt && c.targetId === tid &&
-        (phase !== 'N' || ((c.fields || []).length === 3 && c.fields.every(function (f, i) { return f.label === GROUP_COMMENT_FIELDS[i]; })));
+      return c.phase === phase && c.targetType === tt && c.targetId === tid;
     }).sort(byTime);
   }
   function isOnline(id) { return S.presence.some(function (p) { return p.id === id; }); }
@@ -768,15 +767,18 @@
       return L().groups.filter(function (name) { return new RegExp('^' + x + '모둠(?:\\D|$)').test(name); })[0];
     }).filter(function (x) { return x && x !== g; });
   }
-  var PLAN_FIELDS = [{key:'plan',label:'방안'}, {key:'reason',label:'이유'}, {key:'support',label:'근거·사례·예시'}];
+  var PLAN_FIELDS = [{key:'plan',label:'방안'}, {key:'basis',label:'방안의 근거·사례·예시'}];
   function planFieldLabel(f, n) {
-    return f.key === 'plan' ? '방안 ' + n : f.key === 'reason' ? '이유 ' + n : '이유 ' + n + '의 근거·사례·예시';
+    return f.key === 'plan' ? '방안 ' + n : '방안 ' + n + '의 근거·사례·예시';
   }
   function planField(w, kind, n, key) {
     var value = w[kind + n + '_' + key];
     if (value != null) return value;
-    if (key === 'support') {
-      var old = [{key:'evidence',label:'근거'}, {key:'example',label:'사례'}].map(function (part) {
+    if (key === 'basis') {
+      var parts = [{key:'reason',label:'이유'}];
+      if (w[kind + n + '_support'] != null) parts.push({key:'support',label:'근거·사례·예시'});
+      else parts = parts.concat([{key:'evidence',label:'근거'}, {key:'example',label:'사례'}]);
+      var old = parts.map(function (part) {
         var text = w[kind + n + '_' + part.key];
         return text ? part.label + ': ' + text : '';
       }).filter(Boolean).join('\n');
@@ -958,7 +960,7 @@
         ' / 수용할 부분: ' + (a.accept || '미작성') + ' / 제외할 부분: ' + (a.exclude || '미작성') + ' / 검증되지 않은 부분: ' + (a.uncertain || '미작성'));
     });
     lines.push('', '모둠의 결과 (I단계에서 저장한 중간 해결안): ' + (storedPlans(w, 'mid') || '미작성'));
-    lines.push('모둠의 수정안 (N단계): ' + (w.revision || '미작성'));
+    lines.push('모둠의 수정안 (N단계): ' + (storedPlans(w, 'rev') || '미작성'));
     return lines.join('\n');
   }
   function renderK() {
@@ -984,12 +986,12 @@
     out += '<div class="k-reference-grid"><div class="k-reference k-reference-t"><h3>🟠 처음의 나의 생각 · T</h3>' +
       (S.d.tcardsById[me().id] ? tCardBody(S.d.tcardsById[me().id]) : '<div class="empty">아직 T단계 생각이 없어요.</div>') + '</div>' +
       '<div class="k-reference k-reference-n"><h3>🔵 모둠이 생각해 낸 해결책 · N</h3>' +
-      (work.revision ? orDash(work.revision) : (work.solution ? '<small>I단계 중간 해결안 · N단계 수정안 저장 전</small>' + orDash(work.solution) : '<div class="empty">아직 저장된 모둠 해결안이 없어요.</div>')) + '</div></div>';
+      (work.revision ? orDash(storedPlans(work, 'rev')) : (work.solution ? '<small>I단계 중간 해결안 · N단계 수정안 저장 전</small>' + orDash(storedPlans(work, 'mid')) : '<div class="empty">아직 저장된 모둠 해결안이 없어요.</div>')) + '</div></div>';
     out += section('K', '🏁 최종 결과물');
     out += '<div class="notice k-personal-guide"><b>수업을 진행하면서 바뀐 나의 생각을 포함하여 최종 결과를 작성해 보세요.</b><br><strong>나의 의견은 모둠의 의견과 달라도 괜찮아요. 개인별로 작성해요.</strong></div>' +
       '<div class="card accent ph-K">' +
       '<p><b>나의 입장을 선택해요.</b></p><div class="k-stance"><b>유전자 조작기술은 인간에게</b> <span class="decisions">' + ['축복', '재앙'].map(function (choice) {
-        return '<label class="dec"><input type="radio" name="kstance" data-d="K.stance" value="' + choice + '"' + (dv('K.stance', f.stance) === choice ? ' checked' : '') + '><span>' + choice + '</span></label>';
+        return '<label class="dec k-choice ' + (choice === '축복' ? 'k-blessing' : 'k-disaster') + '"><input type="radio" name="kstance" data-d="K.stance" value="' + choice + '"' + (dv('K.stance', f.stance) === choice ? ' checked' : '') + '><span>' + choice + '</span></label>';
       }).join(' <span>/</span> ') + '</span> <b>이다.</b></div>' +
       '<p class="meta">이유와 그 이유를 뒷받침하는 근거나 사례를 짝지어 적어요. 최대 3가지까지 작성할 수 있어요.</p>' +
       [1, 2, 3].map(function (i) { return '<div class="k-reason"><label class="lbl">이유 ' + i + '</label>' + ta('K.reason' + i, f['reason' + i], '~하기 때문이다.', 2) + '<label class="lbl">이유 ' + i + '의 근거·사례·예시</label>' + ta('K.evidence' + i, f['evidence' + i], '이유를 뒷받침하는 근거나 사례를 적어요.', 3) + '</div>'; }).join('') +
