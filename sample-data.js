@@ -438,9 +438,19 @@ window.SAMPLE_DATA = function () {
     });
   });
 
-  /* I 다른 모둠 해결안에 댓글: 각 모둠이 다음 모둠과 세 모둠 뒤에 하나씩 */
+  /* I 다른 모둠 해결안에 댓글: 다음 두 모둠 */
+  var DIFFERENCES = [
+    '우리는 기술을 먼저 발전시키는 데 무게를 뒀는데, 너희는 사람의 권리와 선택을 먼저 살폈어.',
+    '우리는 기술의 좋은 효과를 더 강조했는데, 너희는 부작용을 줄이는 일이 더 중요하다고 봤어.',
+    '우리는 이용자가 스스로 선택하도록 하자고 했는데, 너희는 모두가 지켜야 할 기준을 정하자고 했어.',
+    '우리는 연구를 계속하면서 살펴보자고 했는데, 너희는 안전이 확인된 뒤에 허용하자고 했어.',
+    '우리는 기술을 이용하는 사람을 돕는 데 집중했는데, 너희는 다른 생명에게 미칠 영향을 더 살폈어.',
+    '우리는 혜택을 넓게 나누는 방안을 제시했는데, 너희는 위험을 감시하고 줄이는 방안을 강조했어.',
+    '우리는 먼저 필요한 곳에 적용하자고 했는데, 너희는 적용 범위를 제한하는 기준부터 제시했어.',
+    '우리는 전문가의 점검을 강조했는데, 너희는 시민이 결정 과정에 참여해야 한다고 봤어.'
+  ];
   STORY.forEach(function (st, g) {
-    [1, 3].forEach(function (step, j) {
+    [1, 2].forEach(function (step, j) {
       var tg = (g + step) % 8, author = ids[g * 4 + (j * 2 + g) % 4];
       var ts = STORY[tg];
       addComment({
@@ -448,7 +458,7 @@ window.SAMPLE_DATA = function () {
         authorId: author, authorName: sname(author), authorGroup: GROUPS[g], createdAt: t(33 - g - j),
         fields: [
           { label: '나와 비슷한 점', value: '우리 모둠도 "' + st.key + '"를 다루면서 규칙과 신중함이 필요하다고 정리했어.' },
-          { label: '다른 점', value: '우리는 ' + st.key + ' 쪽에서 해결안을 만들었는데, 너희는 ' + ts.key + ' 쪽을 깊게 다뤘어.' },
+          { label: '다른 점', value: DIFFERENCES[(g * 2 + j) % DIFFERENCES.length] },
           { label: '잘한 점', value: ['누가 결정하는지까지 정한 점이 구체적이야.', '실제 사례를 근거로 써서 설득력이 있어.', '시민 참여를 넣은 점이 좋았어.', '단계별로 넓혀 가는 방법이 현실적이야.'][(g + j) % 4] }
         ]
       });

@@ -272,6 +272,7 @@
           { col: 'tcards', where: { group: g } },
           { col: 'comments', where: { targetGroup: g } },   // 우리 모둠이 받은 댓글
           { col: 'comments', where: { authorId: u } },      // 내가 쓴 댓글
+          { col: 'comments', where: { phase: 'I' } },      // 다른 모둠 해결안의 모둠 댓글
           { col: 'questions', where: { group: g } },
           { col: 'aianswers', where: { group: g } },
           { col: 'verify', where: { group: g } },

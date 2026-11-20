@@ -34,9 +34,9 @@
   var KFIELDS = [
     { f: 'keep', label: '유지된 생각', ph: '처음 생각 중에서 끝까지 그대로인 생각은 무엇인가요?' },
     { f: 'changed', label: '바뀐 생각과 그 이유', ph: '어떤 생각이 어떻게 바뀌었나요? 왜 바뀌었나요?' },
-    { f: 'influence', label: '친구와 AI가 준 영향', ph: '친구의 의견과 AI의 정보는 각각 내 생각에 어떤 영향을 주었나요?' },
     { f: 'groupTalk', label: '모둠과의 토의와 의견 교환이 내 생각에 준 영향', ph: '모둠에서 의견을 나누고 해결안을 함께 만들면서 내 생각이 어떻게 달라졌나요?' },
-    { f: 'aiView', label: 'AI의 사용에 대해 내가 변화한 생각', ph: 'AI 답변을 기록하고 검증해 보니, AI를 쓰는 방법에 대한 내 생각이 어떻게 바뀌었나요?' }
+    { f: 'aiView', label: 'AI 답변을 그대로 사용하는 것과 직접 조사·검증하는 과정은 어떻게 다르다고 느꼈나요?', ph: '두 과정의 차이와 활동하며 느낀 점을 적어요.' },
+    { f: 'aiThinking', label: '앞으로 AI를 사용하기 전에 어떤 과정을 거치면 내 생각을 AI에 맡기지 않고 스스로 생각할 수 있을까요?', ph: 'AI를 사용하기 전에 내가 먼저 할 일을 적어요.' }
   ];
 
   /* 화면 상태 */
@@ -615,8 +615,9 @@
   /* ---------- 댓글 (표 양식) ---------- */
   function commentTable(c) {
     var canDel = isTeacher() || c.authorId === me().id;
+    var caption = c.phase === 'I' && c.authorGroup ? esc(c.authorGroup) + ' <small>작성자: ' + esc(c.authorName) + '</small>' : esc(c.authorName) + (c.authorGroup ? ' <small>' + esc(c.authorGroup) + '</small>' : '');
     return '<table class="ctable">' +
-      '<caption>💬 ' + esc(c.authorName) + (c.authorGroup ? ' <small>' + esc(c.authorGroup) + '</small>' : '') +
+      '<caption>💬 ' + caption +
       ' <small>' + fmt(c.createdAt) + '</small>' +
       (canDel ? ' <button class="btn small ghost danger cdel" data-act="delComment" data-id="' + c.id + '">삭제</button>' : '') +
       '</caption>' +
@@ -627,7 +628,7 @@
     var prefix = 'c.' + phase + '.' + tt + '.' + tid;
     var fields = L().commentFields[phase];
     return '<div class="cform ph-' + phase + '">' +
-      '<table class="ctable"><caption>✍️ 댓글 쓰기 <small>표의 모든 칸을 채워 주세요</small></caption>' +
+      '<table class="ctable"><caption>✍️ 댓글 쓰기 <small>' + (phase === 'I' ? '모둠에서 상의하여 댓글을 남겨주세요 · 각 칸 공백 제외 10자 이상' : '표의 모든 칸을 채워 주세요') + '</small></caption>' +
       fields.map(function (label, i) {
         return '<tr><th>' + esc(label) + '</th><td>' + ta(prefix + '.' + i, '', label + '을(를) 적어요', 2) + '</td></tr>';
       }).join('') +
@@ -648,12 +649,13 @@
   }
   function updateCommentButtons(root) {
     (root || document).querySelectorAll('.cform').forEach(function (f) {
-      var ok = Array.prototype.every.call(f.querySelectorAll('textarea'), function (t) { return t.value.trim(); });
+      var isI = f.classList.contains('ph-I');
+      var ok = Array.prototype.every.call(f.querySelectorAll('textarea'), function (t) { return isI ? t.value.replace(/\s/g, '').length >= 10 : !!t.value.trim(); });
       var b = f.querySelector('.cbtn');
       var hint = f.querySelector('.chint');
       if (b) b.disabled = !ok;
       if (hint) {
-        hint.textContent = ok ? '✔ 모든 칸을 채웠어요. 등록할 수 있어요!' : '모든 칸을 채워야 등록 버튼이 눌려요.';
+        hint.textContent = ok ? '✔ 모든 칸을 채웠어요. 등록할 수 있어요!' : (isI ? '각 칸을 공백 제외 10자 이상 작성해요.' : '모든 칸을 채워야 등록 버튼이 눌려요.');
         hint.className = 'chint' + (ok ? ' ok' : '');
       }
     });
@@ -754,6 +756,13 @@
   /* ==================================================================
    * I — AI 협업
    * ================================================================== */
+  function assignedGroups(g) {
+    var match = String(g).match(/^(\d+)모둠/), n = match ? Number(match[1]) : 0;
+    if (!n) return [];
+    return [n % 8 + 1, (n + 1) % 8 + 1].map(function (x) {
+      return L().groups.filter(function (name) { return new RegExp('^' + x + '모둠(?:\\D|$)').test(name); })[0];
+    }).filter(function (x) { return x && x !== g; });
+  }
   function renderI() {
     var g = myGroup();
     var out = phaseHead('I', true);
@@ -788,20 +797,22 @@
       ta('sol.' + g, w.solution, 'AI 답변과 모둠 토의를 바탕으로, 지금까지의 해결안을 적어요.', 6) +
       '<div class="btn-row"><button class="btn primary ph-I" data-act="saveSol">중간 해결안 저장</button>' +
       (w.solutionAt ? '<span class="meta">마지막 저장: ' + esc(w.solutionBy || '') + ' · ' + fmt(w.solutionAt) + '</span>' : '') + '</div>' +
-      (w.solution ? commentsBlock('I', 'solution', g, isTeacher(), '다른 모둠이 남긴 댓글') : '') +
+      (w.solution ? commentsBlock('I', 'solution', g, false, '다른 모둠이 남긴 댓글') : '') +
       '</div>';
 
-    out += section('I', '👀 다른 모둠의 중간 해결안', '<small>다른 모둠 해결안에 표 양식으로 댓글을 남겨요</small>');
-    var others = L().groups.filter(function (x) { return x !== g; });
+    var assigned = assignedGroups(g);
+    out += section('I', '👀 다른 모둠의 중간 해결안', '<small>지정된 ' + esc(assigned.join(', ')) + '에 모둠과 상의하여 댓글을 남겨요.</small>');
+    var others = assigned.concat(L().groups.filter(function (x) { return x !== g && assigned.indexOf(x) < 0; }));
     var any = false;
     out += '<div class="grid2">' + others.map(function (og) {
       var ow = gw(og);
-      if (!ow.solution) return '';
+      if (!ow.solution && assigned.indexOf(og) < 0) return '';
       any = true;
       return '<div class="card"><div class="card-head"><span class="avatar ph-I">' + esc(og.replace(/[^0-9]/g, '') || og[0]) + '</span><b>' + esc(og) + '</b>' +
+        (assigned.indexOf(og) >= 0 ? '<span class="status">댓글을 남길 모둠</span>' : '<span class="status">보기만 가능</span>') +
         '<span class="right"><small>' + fmt(ow.solutionAt) + '</small></span></div>' +
-        '<div class="result-text ph-I">' + nl(ow.solution) + '</div>' +
-        commentsBlock('I', 'solution', og, true) +
+        '<div class="result-text ph-I">' + (ow.solution ? nl(ow.solution) : '아직 중간 해결안을 작성하지 않았어요.') + '</div>' +
+        (ow.solution ? commentsBlock('I', 'solution', og, !isTeacher() && assigned.indexOf(og) >= 0) : '') +
         '</div>';
     }).join('') + '</div>';
     if (!any) out += '<div class="empty">아직 다른 모둠이 중간 해결안을 올리지 않았어요.</div>';
@@ -941,7 +952,13 @@
     var f = S.d.finalsById[me().id] || {};
     out += section('K', '🏁 최종 결과물');
     out += '<div class="card accent ph-K">' +
-      '<label class="lbl">최종 결과물 (글)</label>' + ta('K.text', f.text, '모둠 활동을 거쳐 완성한 나의 최종 주장과 해결 방안을 적어요.', 7) +
+      '<p><b>유전자 조작 기술은 인간에게</b> 나의 입장을 선택해요.</p><div class="decisions">' + ['축복', '재앙'].map(function (choice) {
+        return '<label class="dec"><input type="radio" name="kstance" data-d="K.stance" value="' + choice + '"' + (dv('K.stance', f.stance) === choice ? ' checked' : '') + '><span>' + choice + '</span></label>';
+      }).join('') + '</div>' +
+      '<p class="meta">이유와 그 이유를 뒷받침하는 근거나 사례를 짝지어 적어요. 최대 3가지까지 작성할 수 있어요.</p>' +
+      [1, 2, 3].map(function (i) { return '<div class="k-reason"><b>이유 ' + i + '</b><div class="k-reason-grid"><div><label class="lbl">이유 ' + i + ' · ~하기 때문이다</label>' + ta('K.reason' + i, f['reason' + i], '왜 그렇게 생각하나요?', 3) + '</div><div><label class="lbl">근거·예시·사례</label>' + ta('K.evidence' + i, f['evidence' + i], '이유를 뒷받침하는 근거나 사례를 적어요.', 3) + '</div></div></div>'; }).join('') +
+      (f.text && !f.stance && !f.reason1 ? '<label class="lbl">이전에 작성한 최종 결과물</label>' + ta('K.text', f.text, '', 5) : '') +
+      (f.legacyText ? '<label class="lbl">이전에 작성한 최종 결과물</label><div class="notice">' + nl(f.legacyText) + '</div>' : '') +
       '<div class="btn-row"><button class="btn primary ph-K" data-act="saveFinal">저장</button>' +
       (f.updatedAt ? '<span class="meta">마지막 저장 ' + fmt(f.updatedAt) + '</span>' : '') + '</div>' +
       '</div>';
@@ -953,7 +970,7 @@
       '<div class="btn-row"><button class="btn primary ph-K" data-act="saveFinal">성찰 저장</button></div>' +
       '</div></div>';
     out += section('K', '🎨 모둠 발표자료 만들기');
-    out += '<div class="card accent ph-K"><p>모둠원들의 처음 의견과 모둠에서 함께 저장한 기록으로 A4 포스터 프롬프트를 만들어요. 먼저 <b>프롬프트 만들기</b>를 누른 뒤 복사해서 제미나이에 넣어주세요. 기록을 바꾸었다면 저장 후 다시 만들어요.</p>' +
+    out += '<div class="card accent ph-K"><ol class="poster-steps"><li>모둠원 모두가 작성을 완료했는지 확인해요.</li><li>모둠원 한 명이 아래 <b>프롬프트 만들기</b>를 눌러요.</li><li>복사 버튼을 누르고 제미나이에 붙여 넣어요.</li><li>완성된 이미지를 저장해 <b>발표자료 갤러리</b> 탭의 우리 모둠에 올려요.</li></ol>' +
       '<p class="privacy-note">제미나이에 붙여 넣으면 모둠원 이름과 작성 내용이 제미나이로 전송돼요. 이름 외에 연락처 등 개인정보가 들어 있지 않은지 확인해 주세요.</p>' +
       '<div class="btn-row"><button class="btn primary ph-K" data-act="generatePresentationPrompt">✨ 프롬프트 만들기</button></div>' +
       '<textarea id="presentation-prompt" data-d="presentation.prompt" rows="8" aria-label="발표자료 생성 프롬프트" placeholder="프롬프트 만들기 버튼을 눌러 주세요.">' + esc(dv('presentation.prompt', '')) + '</textarea>' +
@@ -1388,6 +1405,8 @@
       var prefix = 'c.' + phase + '.' + tt + '.' + tid;
       var fields = L().commentFields[phase].map(function (label, i) { return { label: label, value: take(prefix + '.' + i) }; });
       if (fields.some(function (f) { return !f.value; })) return toast('표의 모든 칸을 채워 주세요');
+      if (phase === 'I' && (isTeacher() || tt !== 'solution' || assignedGroups(myGroup()).indexOf(tid) < 0)) return toast('지정된 모둠에만 댓글을 남길 수 있어요.');
+      if (phase === 'I' && fields.some(function (f) { return f.value.replace(/\s/g, '').length < 10; })) return toast('각 칸을 공백 제외 10자 이상 작성해 주세요.');
       if (phase === 'H' && commentsOn(phase, tt, tid).length >= MAX_H_COMMENTS) return toast('이미 이 글에 댓글이 2개 달렸어요');
       clearDrafts(prefix);
       return DataStore.addComment({
@@ -1502,7 +1521,13 @@
     /* K */
     saveFinal: function () {
       var f = S.d.finalsById[me().id] || {};
-      var data = { text: take('K.text', f.text), updatedAt: Date.now() };
+      var data = { stance: take('K.stance', f.stance), updatedAt: Date.now() };
+      [1, 2, 3].forEach(function (i) { data['reason' + i] = take('K.reason' + i, f['reason' + i]); data['evidence' + i] = take('K.evidence' + i, f['evidence' + i]); });
+      var hasStructure = data.stance || [1, 2, 3].some(function (i) { return data['reason' + i] || data['evidence' + i]; });
+      if (hasStructure) {
+        data.text = (data.stance ? '유전자 조작 기술은 인간에게 ' + data.stance + '이다.\n' : '') + [1, 2, 3].map(function (i) { return data['reason' + i] || data['evidence' + i] ? '이유 ' + i + ': ' + (data['reason' + i] || '미작성') + '\n근거·사례: ' + (data['evidence' + i] || '미작성') : ''; }).filter(Boolean).join('\n');
+        if (f.text && !f.stance && !f.reason1 && !f.legacyText) data.legacyText = take('K.text', f.text);
+      } else data.text = take('K.text', f.text);
       KFIELDS.forEach(function (x) { data[x.f] = take('K.' + x.f, f[x.f]); });
       clearDrafts('K');
       return DataStore.setDoc('finals', me().id, data, { merge: true }).then(function () { return done('저장했어요'); });
