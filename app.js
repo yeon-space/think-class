@@ -805,6 +805,14 @@
     });
     return { data:data, text:lines.join('\n\n') };
   }
+  function storedPlans(w, kind) {
+    var structured = [1,2,3].some(function (n) { return PLAN_FIELDS.some(function (f) { return w[kind + n + '_' + f.key] != null; }); });
+    if (!structured) return kind === 'mid' ? (w.solution || '') : (w.revision || '');
+    return [1,2,3].map(function (n) {
+      var parts = PLAN_FIELDS.map(function (f) { var v = planField(w, kind, n, f.key); return v ? f.label + ': ' + v : ''; }).filter(Boolean);
+      return parts.length ? '방안 ' + n + '\n' + parts.join('\n') : '';
+    }).filter(Boolean).join('\n\n');
+  }
   function revisionEditor(g, w) {
     var prefix = 'rev.' + g;
     return '<div class="revision-headings"><b>I단계 원래 의견</b><span></span><b>N단계 모둠 수정안</b></div>' +
@@ -882,7 +890,7 @@
   function renderN() {
     var g = myGroup(), w = gw(g), out = phaseHead('N', true), assigned = assignedGroups(g);
     out += section('N', '💬 모둠끼리 의견을 나눠요 (모둠 피드백)', '<small>' + esc(assigned.join(', ')) + '에 모둠과 상의하여 댓글을 남겨요.</small>');
-    out += '<div class="card accent ph-N"><h3>우리 모둠의 중간 해결안 · I단계</h3><div class="result-text ph-I">' + orDash(w.solution) + '</div>' +
+    out += '<div class="card accent ph-N"><h3>우리 모둠의 중간 해결안 · I단계</h3><div class="result-text ph-I">' + orDash(storedPlans(w, 'mid')) + '</div>' +
       '<h3>우리 모둠이 받은 댓글</h3>' + commentsBlock('N', 'solution', g, false, '다른 모둠이 남긴 댓글') + '</div>';
     var others = assigned.concat(L().groups.filter(function (x) { return x !== g && assigned.indexOf(x) < 0; }));
     out += '<div class="grid2">' + others.map(function (og) {
@@ -890,7 +898,7 @@
       if (!ow.solution && !chosen) return '';
       return '<div class="card accent ph-N"><div class="card-head"><span class="avatar ph-N">' + esc(og.replace(/[^0-9]/g, '') || og[0]) + '</span><b>' + esc(og) + '</b>' +
         '<span class="status">' + (chosen ? '댓글을 남길 모둠' : '보기만 가능') + '</span></div>' +
-        '<div class="result-text ph-N">' + (ow.solution ? nl(ow.solution) : '아직 중간 해결안을 작성하지 않았어요.') + '</div>' +
+        '<div class="result-text ph-N">' + (ow.solution ? nl(storedPlans(ow, 'mid')) : '아직 중간 해결안을 작성하지 않았어요.') + '</div>' +
         (ow.solution ? commentsBlock('N', 'solution', og, !isTeacher() && chosen) : '') + '</div>';
     }).join('') + '</div>';
     out += section('N', '🔄 친구들의 의견 보고 우리 의견 수정하기');
@@ -949,7 +957,7 @@
       lines.push('[' + (i + 1) + '번 질문 상자] ' + q.text + '\n→ [' + (i + 1) + '번 답변·검증 상자] 우리 말로 정리한 답변: ' + (a.summary || '미작성') +
         ' / 수용할 부분: ' + (a.accept || '미작성') + ' / 제외할 부분: ' + (a.exclude || '미작성') + ' / 검증되지 않은 부분: ' + (a.uncertain || '미작성'));
     });
-    lines.push('', '모둠의 결과 (I단계에서 저장한 중간 해결안): ' + (w.solution || '미작성'));
+    lines.push('', '모둠의 결과 (I단계에서 저장한 중간 해결안): ' + (storedPlans(w, 'mid') || '미작성'));
     lines.push('모둠의 수정안 (N단계): ' + (w.revision || '미작성'));
     return lines.join('\n');
   }
