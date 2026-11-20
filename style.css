@@ -498,6 +498,23 @@ table.data tr.grp td { background: #FBF8F3; font-weight: 800; color: var(--muted
 .k-reason { margin: 16px 0; padding: 14px; border: 1px solid #e3d5ef; border-radius: 12px; background: #faf7fd; }
 .k-reason-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .poster-steps { padding-left: 24px; line-height: 1.9; }
+.k-stance { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; line-height: 1.8; }
+.k-stance .decisions { flex-direction: row; align-items: center; }
+.k-reference-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+.k-reference { padding: 16px; border-radius: 14px; border: 1px solid; }
+.k-reference h3 { margin: 0 0 10px; }
+.k-reference-t { background: var(--t-soft); border-color: #f4c2a8; }
+.k-reference-n { background: var(--n-soft); border-color: #adc8ed; }
+.k-personal-guide { background: var(--k-soft); border: 1px solid #cbb6df; line-height: 1.8; }
+.k-personal-guide strong { color: #643690; }
+.plan-block { padding: 12px; margin: 12px 0; background: #f9fafb; border: 1px solid #dfe7ed; border-radius: 12px; }
+.plan-block h3 { margin: 0 0 8px; }
+.revision-layout { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); gap: 12px; align-items: start; }
+.revision-arrow { font-size: 2rem; color: #3A76C4; padding-top: 50px; }
+.source-links.ph-I { background: #eef9f6; border-color: #a5d8ce; }
+.source-links.ph-I a { color: #146d60; border-color: #9bcec4; }
+@media (max-width: 700px) { .revision-layout { grid-template-columns: 1fr; } .revision-arrow { padding: 0; text-align: center; transform: rotate(90deg); } }
+@media (max-width: 700px) { .k-reference-grid { grid-template-columns: 1fr; } }
 @media (max-width: 650px) { .k-reason-grid { grid-template-columns: 1fr; } }
 .source-links div { display: flex; flex-wrap: wrap; gap: 8px; }
 .source-links a { display: inline-block; box-sizing: border-box; max-width: 100%; overflow-wrap: anywhere; background: white; border: 1px solid #9fbfdd; border-radius: 8px; padding: 8px 12px; color: #175889; text-decoration: none; font-weight: 700; }

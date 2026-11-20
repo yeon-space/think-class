@@ -10,17 +10,18 @@
    * ------------------------------------------------------------------ */
   var PHASES = [
     { k: 'T', title: '개인 사고 형성', en: 'Thinking Initiation',     short: '혼자 생각하기', icon: '💭' },
-    { k: 'H', title: '인간 협력',     en: 'Human Collaboration',     short: '모둠과 비교하기', icon: '🤝' },
-    { k: 'I', title: 'AI 협업',       en: 'Interaction with AI',     short: 'AI와 함께하기', icon: '🤖' },
-    { k: 'N', title: '검증과 종합',   en: 'Navigating & Critiquing', short: '따져 보고 합치기', icon: '🔍' },
-    { k: 'K', title: '재구성과 내면화', en: 'Knowledge Synthesis',   short: '완성하고 돌아보기', icon: '🌱' }
+    { k: 'H', title: '인간 협력을 통한 사고 명료화', en: 'Human Collaboration', short: '모둠과 비교하기', icon: '🤝' },
+    { k: 'I', title: 'AI와의 협업을 통한 해결 방안 확장', en: 'Interaction with AI', short: 'AI와 함께하기', icon: '🤖' },
+    { k: 'N', title: '인간 중심의 검증과 종합', en: 'Navigating & Critiquing', short: '따져 보고 합치기', icon: '🔍' },
+    { k: 'K', title: '지식 재구성과 내면화', en: 'Knowledge Synthesis', short: '완성하고 돌아보기', icon: '🌱' }
   ];
   // 영어 이름: 첫 글자(T·H·I·N·K)에 단계 색
   function enName(p) { return '<span class="en"><b>' + p.en[0] + '</b>' + esc(p.en.slice(1)) + '</span>'; }
   var PH = {};
   PHASES.forEach(function (p) { PH[p.k] = p; });
   var PK = PHASES.map(function (p) { return p.k; });
-  var COMMENT_PHASES = ['H', 'I'];
+  var COMMENT_PHASES = ['H'];
+  var GROUP_COMMENT_FIELDS = ['👍 이 방안이 좋은 이유', '💡 추가하면 좋을 요소', '🔍 한 번 더 살펴봐야 하는 부분 (사실·과학적 오류)'];
   var DECISIONS = [
     { v: '수용', icon: '✅', cls: 'acc' },
     { v: '수정', icon: '✏️', cls: 'mod' },
@@ -120,12 +121,12 @@
   var DID = {
     H: function (s) { return S.d.questions.some(function (q) { return q.group === s.group && isMyQ(q, s); }); },
     I: function (s) { return S.d.aianswers.some(function (a) { return a.group === s.group && a['c_' + s.id]; }); },
-    N: function (s) { return groupVerify(s.group).some(function (v) { return v['c_' + s.id]; }); }
+    N: function (s) { return !!gw(s.group).revision; }
   };
   var TODO = {
     H: 'AI에게 물어볼 질문을 1개 이상 추가해요.',
-    I: 'AI 답변을 1개 이상 기록하고 저장해요.',
-    N: '검증표에서 1줄 이상 판단하고 저장해요.'
+    I: '내가 만든 질문의 AI 답변과 검토 내용을 기록하고 저장해요.',
+    N: '모둠에서 다른 모둠의 의견을 읽고 함께 수정안을 저장해요.'
   };
   function participation(phase, g) {
     var mem = membersOf(g), fn = DID[phase];
@@ -171,13 +172,12 @@
     return Promise.all(jobs).then(function () { return jobs.length; });
   }
   function syncVerifyAndRefresh() {
-    if (S.tab !== 'N' || !S.user) return;
-    return syncVerify(myGroup()).then(function (n) { if (n) return refresh(false); }).catch(actionError);
+    return; // 이전 검증 기록은 보존하고, 새 검토 내용은 I단계에 저장한다.
   }
   function gw(g) { return S.d.groupworkById[g] || {}; }
   function commentsOn(phase, tt, tid) {
     return S.d.comments.filter(function (c) {
-      return c.phase === phase && c.targetType === tt && c.targetId === tid;
+      return (c.phase === phase || (phase === 'N' && c.phase === 'I' && tt === 'solution')) && c.targetType === tt && c.targetId === tid;
     }).sort(byTime);
   }
   function isOnline(id) { return S.presence.some(function (p) { return p.id === id; }); }
@@ -232,13 +232,16 @@
    *   sol.모둠 / uniq.모둠 / ai.질문ID.* / v.검증행ID.* / qe.질문ID
    * 입력을 시작한 뒤 다른 친구가 먼저 저장했다면, 저장할 때 알려 줍니다. */
   function sharedPrefix(key) {
-    if (/^(sol|uniq|qe)\./.test(key)) return key;
+    var groupEdit = /^((?:sol|rev)\.[^.]+)(?:\.|$)/.exec(key);
+    if (groupEdit) return groupEdit[1];
+    if (/^(uniq|qe)\./.test(key)) return key;
     var m = /^((ai|v)\.[^.]+)\./.exec(key);
     return m ? m[1] : null;
   }
   function stampOf(prefix) {   // [마지막 저장 시각, 저장한 사람, 최신 내용(글)]
     var dot = prefix.indexOf('.'), kind = prefix.slice(0, dot), id = prefix.slice(dot + 1), x;
     if (kind === 'sol') { x = gw(id); return [x.solutionAt || 0, x.solutionBy || '', x.solution || '']; }
+    if (kind === 'rev') { x = gw(id); return [x.revisionAt || 0, x.revisionBy || '', x.revision || '']; }
     if (kind === 'uniq') { x = gw(id); return [x.uniqueIdeaAt || 0, x.uniqueIdeaBy || '', x.uniqueIdea || '']; }
     if (kind === 'ai') { x = S.d.aianswersById[id] || {}; return [x.updatedAt || 0, x.updatedBy || '', x.summary || x.answer || '']; }
     if (kind === 'v') { x = S.d.verifyById[id] || {}; return [x.updatedAt || 0, x.updatedBy || '', (x.decision ? '[' + x.decision + '] ' : '') + (x.info || '') + (x.reason ? '\n근거: ' + x.reason : '')]; }
@@ -248,8 +251,8 @@
   function sharedTarget(prefix) {
     var dot=prefix.indexOf('.'), kind=prefix.slice(0,dot), id=prefix.slice(dot+1);
     var spec = {
-      sol:['groupwork',['solution','solutionAt']], uniq:['groupwork',['uniqueIdea','uniqueIdeaAt']],
-      ai:['aianswers',['answer','tool','hasSource','sourceNote','summary','updatedAt']],
+      sol:['groupwork',['solution','solutionAt']], rev:['groupwork',['revision','revisionAt','solution','solutionAt']], uniq:['groupwork',['uniqueIdea','uniqueIdeaAt']],
+      ai:['aianswers',['answer','tool','hasSource','sourceNote','summary','accept','exclude','uncertain','updatedAt']],
       v:['verify',['info','infoEdited','decision','reason','updatedAt']], qe:['questions',['text','updatedAt']]
     }[kind];
     return {col:spec[0], id:id, fields:spec[1]};
@@ -576,20 +579,21 @@
     var guides = {
       T:'자료를 읽고 나의 주장, 근거와 보완방안을 적은 뒤 제출해요.',
       H:'친구의 생각을 읽고 댓글을 나누며 AI에게 물어볼 질문을 만들어요.',
-      I:'모둠 질문을 AI에게 묻고 답변을 기록한 뒤 우리 말로 정리해요.',
-      N:'믿을 만한 자료를 찾아 AI 답변을 검증하고 판단 근거를 적어요.',
+      I:'내 질문의 AI 답변을 기록하고, 믿을 만한 자료로 답변을 검토한 뒤 모둠 해결안을 작성해요.',
+      N:'다른 모둠에 의견을 남기고 받은 의견을 살펴 우리 모둠 해결안을 수정해요.',
       K:'최종 생각을 정리하고 T단계와 비교하며 활동을 돌아봐요.'
     };
     var pending = '';
     if (!isTeacher() && S.d) {
       var c = S.d.tcardsById[me().id] || {}, f = S.d.finalsById[me().id] || {};
       if (k === 'T') pending = c.submitted ? '✅ T단계 생각을 제출했어요.' : '⬜ 아직 T단계 생각을 제출하지 않았어요.';
+      else if (k === 'N') pending = gw(me().group).revision ? '✅ 모둠 수정안을 저장했어요.' : '⬜ 모둠과 상의하여 수정안을 작성해요.';
       else if (DID[k]) pending = DID[k](me()) ? '✅ 나의 할 일에 참여했어요.' : '⬜ 아직 나의 할 일을 하지 않았어요. ' + TODO[k];
       else if (k === 'K') pending = f.text ? '✅ 최종 결과물을 저장했어요.' : '⬜ 아직 최종 결과물을 저장하지 않았어요.';
     }
     return '<div class="phase-head ph-' + k + '"><div class="big">' + k + '</div><div>' +
       '<h2>' + p.icon + ' ' + p.title + lockNote + '</h2>' + enName(p) +
-      (L().prompts[k] ? '<p class="q">' + nl(L().prompts[k]) + '</p>' : '') +
+      ((k !== 'I' && k !== 'N' && L().prompts[k]) ? '<p class="q">' + nl(L().prompts[k]) + '</p>' : '') +
       '</div>' + pick + '</div>' +
       '<div class="phase-guide ph-' + k + '"><b>이 단계에서 할 일</b><span>' + guides[k] + '</span>' +
       (pending ? '<small>' + pending + '</small>' : '') + '</div>';
@@ -615,7 +619,7 @@
   /* ---------- 댓글 (표 양식) ---------- */
   function commentTable(c) {
     var canDel = isTeacher() || c.authorId === me().id;
-    var caption = c.phase === 'I' && c.authorGroup ? esc(c.authorGroup) + ' <small>작성자: ' + esc(c.authorName) + '</small>' : esc(c.authorName) + (c.authorGroup ? ' <small>' + esc(c.authorGroup) + '</small>' : '');
+    var caption = (c.phase === 'I' || c.phase === 'N') && c.authorGroup ? esc(c.authorGroup) + ' <small>작성자: ' + esc(c.authorName) + '</small>' : esc(c.authorName) + (c.authorGroup ? ' <small>' + esc(c.authorGroup) + '</small>' : '');
     return '<table class="ctable">' +
       '<caption>💬 ' + caption +
       ' <small>' + fmt(c.createdAt) + '</small>' +
@@ -626,9 +630,9 @@
   }
   function commentForm(phase, tt, tid) {
     var prefix = 'c.' + phase + '.' + tt + '.' + tid;
-    var fields = L().commentFields[phase];
+    var fields = phase === 'N' ? GROUP_COMMENT_FIELDS : L().commentFields[phase];
     return '<div class="cform ph-' + phase + '">' +
-      '<table class="ctable"><caption>✍️ 댓글 쓰기 <small>' + (phase === 'I' ? '모둠에서 상의하여 댓글을 남겨주세요 · 각 칸 공백 제외 10자 이상' : '표의 모든 칸을 채워 주세요') + '</small></caption>' +
+      '<table class="ctable"><caption>✍️ 댓글 쓰기 <small>' + (phase === 'N' ? '모둠에서 상의하여 댓글을 남겨주세요 · 각 칸 공백 제외 10자 이상' : '표의 모든 칸을 채워 주세요') + '</small></caption>' +
       fields.map(function (label, i) {
         return '<tr><th>' + esc(label) + '</th><td>' + ta(prefix + '.' + i, '', label + '을(를) 적어요', 2) + '</td></tr>';
       }).join('') +
@@ -649,13 +653,13 @@
   }
   function updateCommentButtons(root) {
     (root || document).querySelectorAll('.cform').forEach(function (f) {
-      var isI = f.classList.contains('ph-I');
-      var ok = Array.prototype.every.call(f.querySelectorAll('textarea'), function (t) { return isI ? t.value.replace(/\s/g, '').length >= 10 : !!t.value.trim(); });
+      var isGroup = f.classList.contains('ph-N');
+      var ok = Array.prototype.every.call(f.querySelectorAll('textarea'), function (t) { return isGroup ? t.value.replace(/\s/g, '').length >= 10 : !!t.value.trim(); });
       var b = f.querySelector('.cbtn');
       var hint = f.querySelector('.chint');
       if (b) b.disabled = !ok;
       if (hint) {
-        hint.textContent = ok ? '✔ 모든 칸을 채웠어요. 등록할 수 있어요!' : (isI ? '각 칸을 공백 제외 10자 이상 작성해요.' : '모든 칸을 채워야 등록 버튼이 눌려요.');
+        hint.textContent = ok ? '✔ 모든 칸을 채웠어요. 등록할 수 있어요!' : (isGroup ? '각 칸을 공백 제외 10자 이상 작성해요.' : '모든 칸을 채워야 등록 버튼이 눌려요.');
         hint.className = 'chint' + (ok ? ' ok' : '');
       }
     });
@@ -763,17 +767,61 @@
       return L().groups.filter(function (name) { return new RegExp('^' + x + '모둠(?:\\D|$)').test(name); })[0];
     }).filter(function (x) { return x && x !== g; });
   }
+  var PLAN_FIELDS = [{key:'plan',label:'방안'}, {key:'reason',label:'이유'}, {key:'evidence',label:'근거'}, {key:'example',label:'사례'}];
+  function planField(w, kind, n, key) {
+    var value = w[kind + n + '_' + key];
+    if (value != null) return value;
+    if (kind === 'rev') return planField(w, 'mid', n, key);
+    return n === 1 && key === 'plan' ? (w.solution || '') : '';
+  }
+  function planEditor(g, kind, w) {
+    var prefix = (kind === 'mid' ? 'sol.' : 'rev.') + g;
+    return [1,2,3].map(function (n) {
+      return '<div class="plan-block"><h3>방안 ' + n + '</h3>' + PLAN_FIELDS.map(function (f) {
+        return '<label class="lbl">' + f.label + '</label>' + ta(prefix + '.' + n + '_' + f.key, planField(w, kind, n, f.key), f.label + '을(를) 적어요.', 2);
+      }).join('') + '</div>';
+    }).join('');
+  }
+  function planData(prefix, kind, w) {
+    var data = {}, lines = [];
+    [1,2,3].forEach(function (n) {
+      var parts = PLAN_FIELDS.map(function (f) {
+        var key = kind + n + '_' + f.key;
+        data[key] = take(prefix + '.' + n + '_' + f.key, planField(w, kind, n, f.key));
+        return data[key] ? f.label + ': ' + data[key] : '';
+      }).filter(Boolean);
+      if (parts.length) lines.push('방안 ' + n + '\n' + parts.join('\n'));
+    });
+    return { data:data, text:lines.join('\n\n') };
+  }
   function renderI() {
     var g = myGroup();
     var out = phaseHead('I', true);
     var qs = groupQs(g);
 
+    out += '<div class="source-links ph-I"><b>🔎 믿을 만한 자료를 직접 찾아봐요</b><p>교과서나 아래 버튼에 없는 자료도 찾아봐도 좋아요. 공신력 있는 자료를 사용하고, 작성 기관과 날짜를 확인해요.</p>' +
+      '<p class="source-warning"><strong>🚫 검증 자료를 찾을 때는 AI를 사용하지 않아요.</strong></p><div>' +
+      '<a href="https://www.scienceall.com/" target="_blank" rel="noopener noreferrer">사이언스올 · 과학백과 ↗</a>' +
+      '<a href="https://www.foodsafetykorea.go.kr/" target="_blank" rel="noopener noreferrer">식품안전나라 · 식품·GMO ↗</a>' +
+      '<a href="https://www.nibr.go.kr/" target="_blank" rel="noopener noreferrer">국립생물자원관 · 생물·생태 ↗</a>' +
+      '<a href="https://terms.naver.com/" target="_blank" rel="noopener noreferrer">네이버 지식백과 · 과학백과 ↗</a>' +
+      '<a href="https://www.dongascience.com/ko" target="_blank" rel="noopener noreferrer">동아사이언스 · 과학 뉴스 ↗</a>' +
+      '<a href="https://science.ytn.co.kr/" target="_blank" rel="noopener noreferrer">YTN 사이언스 · 과학 뉴스 ↗</a>' +
+      '</div></div>';
     out += section('I', '🤖 질문별 AI 답변 기록');
     if (qs.length) out += participation('I', g);
     if (!qs.length) out += '<div class="empty">H단계에서 AI 질문을 먼저 만들어 주세요.</div>';
     qs.forEach(function (q, i) {
       var a = S.d.aianswersById[q.id] || {};
       var k = 'ai.' + q.id;
+      var canEdit = !isTeacher() && isMyQ(q);
+      if (!canEdit) {
+        out += '<div class="card accent ph-I"><div class="ai-q"><span class="qn">Q' + (i + 1) + '</span><span>' + esc(q.text) + '</span></div>' +
+          '<p class="meta">질문을 작성한 학생이 기록해요. 다른 모둠원은 확인할 수 있어요.</p>' +
+          '<dl class="tfields"><dt>AI 답변</dt><dd>' + orDash(a.answer) + '</dd><dt>사용한 AI·출처</dt><dd>' + orDash([a.tool, a.sourceNote].filter(Boolean).join(' · ')) + '</dd>' +
+          '<dt>우리 말로 정리</dt><dd>' + orDash(a.summary) + '</dd><dt>수용할 부분</dt><dd>' + orDash(a.accept) + '</dd><dt>제외할 부분</dt><dd>' + orDash(a.exclude) + '</dd><dt>검증되지 않은 부분</dt><dd>' + orDash(a.uncertain) + '</dd></dl></div>';
+        return;
+      }
       out += '<div class="card accent ph-I">' +
         '<div class="ai-q"><span class="qn">Q' + (i + 1) + '</span><span>' + esc(q.text) + myQTag(q) + '</span></div>' +
         '<label class="lbl">AI 답변 붙여넣기</label>' + ta(k + '.answer', a.answer, 'AI가 한 답변을 그대로 붙여 넣어요.', 5) +
@@ -784,6 +832,10 @@
         '</div>' +
         conflictBox(k) +
         '<label class="lbl">우리 말로 정리 <small>어려운 말은 쉽게, 중요한 것만 골라서</small></label>' + ta(k + '.summary', a.summary, 'AI 답변을 우리 모둠의 말로 다시 써요.', 3) +
+        '<h3>🔍 AI 답변 검토하기</h3><p class="meta">교과서나 공신력 있는 자료를 직접 찾아 확인해요. 검토 자료를 찾을 때는 AI를 사용하지 않아요.</p>' +
+        '<table class="ctable ai-review"><tbody><tr><th>수용할 부분</th><td>' + ta(k + '.accept', a.accept, '확인하여 받아들일 수 있는 내용을 적어요.', 3) + '</td></tr>' +
+        '<tr><th>제외할 부분</th><td>' + ta(k + '.exclude', a.exclude, '틀리거나 맞지 않아 제외할 내용을 적어요.', 3) + '</td></tr>' +
+        '<tr><th>검증이 되지 않은 부분</th><td>' + ta(k + '.uncertain', a.uncertain, '아직 믿을 만한 근거를 찾지 못한 내용을 적어요.', 3) + '</td></tr></tbody></table>' +
         '<div class="btn-row"><button class="btn primary ph-I" data-act="saveAI" data-id="' + q.id + '">저장</button>' +
         (a.updatedAt ? '<span class="meta">마지막 저장: ' + esc(a.updatedBy || '') + ' · ' + fmt(a.updatedAt) + '</span>' : '') + '</div>' +
         '</div>';
@@ -794,28 +846,10 @@
     out += '<div class="card result ph-I">' +
       '<div class="result-head"><span class="ribbon">모둠 결과</span><span>위의 AI 답변과 모둠 토의를 모아, 우리 모둠의 해결안을 정리해요</span></div>' +
       conflictBox('sol.' + g) +
-      ta('sol.' + g, w.solution, 'AI 답변과 모둠 토의를 바탕으로, 지금까지의 해결안을 적어요.', 6) +
+      planEditor(g, 'mid', w) +
       '<div class="btn-row"><button class="btn primary ph-I" data-act="saveSol">중간 해결안 저장</button>' +
       (w.solutionAt ? '<span class="meta">마지막 저장: ' + esc(w.solutionBy || '') + ' · ' + fmt(w.solutionAt) + '</span>' : '') + '</div>' +
-      (w.solution ? commentsBlock('I', 'solution', g, false, '다른 모둠이 남긴 댓글') : '') +
       '</div>';
-
-    var assigned = assignedGroups(g);
-    out += section('I', '👀 다른 모둠의 중간 해결안', '<small>지정된 ' + esc(assigned.join(', ')) + '에 모둠과 상의하여 댓글을 남겨요.</small>');
-    var others = assigned.concat(L().groups.filter(function (x) { return x !== g && assigned.indexOf(x) < 0; }));
-    var any = false;
-    out += '<div class="grid2">' + others.map(function (og) {
-      var ow = gw(og);
-      if (!ow.solution && assigned.indexOf(og) < 0) return '';
-      any = true;
-      return '<div class="card"><div class="card-head"><span class="avatar ph-I">' + esc(og.replace(/[^0-9]/g, '') || og[0]) + '</span><b>' + esc(og) + '</b>' +
-        (assigned.indexOf(og) >= 0 ? '<span class="status">댓글을 남길 모둠</span>' : '<span class="status">보기만 가능</span>') +
-        '<span class="right"><small>' + fmt(ow.solutionAt) + '</small></span></div>' +
-        '<div class="result-text ph-I">' + (ow.solution ? nl(ow.solution) : '아직 중간 해결안을 작성하지 않았어요.') + '</div>' +
-        (ow.solution ? commentsBlock('I', 'solution', og, !isTeacher() && assigned.indexOf(og) >= 0) : '') +
-        '</div>';
-    }).join('') + '</div>';
-    if (!any) out += '<div class="empty">아직 다른 모둠이 중간 해결안을 올리지 않았어요.</div>';
     return out;
   }
 
@@ -823,66 +857,24 @@
    * N — 검증과 종합
    * ================================================================== */
   function renderN() {
-    var g = myGroup();
-    var out = phaseHead('N', true);
-    var qs = groupQs(g), byQ = verifyByQ(g);
-    out += '<div class="source-links"><b>🔎 믿을 만한 자료를 직접 찾아봐요</b><p>교과서나 아래 버튼에 없는 자료도 찾아봐도 좋아요. 공신력 있는 자료를 사용하고, 작성 기관과 날짜를 확인해요.</p>' +
-      '<p class="source-warning"><strong>🚫 검증 자료를 찾을 때는 AI를 사용하지 않아요.</strong></p><div>' +
-      '<a href="https://www.scienceall.com/" target="_blank" rel="noopener noreferrer">사이언스올 · 과학백과 ↗</a>' +
-      '<a href="https://www.foodsafetykorea.go.kr/" target="_blank" rel="noopener noreferrer">식품안전나라 · 식품·GMO ↗</a>' +
-      '<a href="https://www.nibr.go.kr/" target="_blank" rel="noopener noreferrer">국립생물자원관 · 생물·생태 ↗</a>' +
-      '<a href="https://terms.naver.com/" target="_blank" rel="noopener noreferrer">네이버 지식백과 · 과학백과 ↗</a>' +
-      '<a href="https://www.dongascience.com/ko" target="_blank" rel="noopener noreferrer">동아사이언스 · 과학 뉴스 ↗</a>' +
-      '<a href="https://science.ytn.co.kr/" target="_blank" rel="noopener noreferrer">YTN 사이언스 · 과학 뉴스 ↗</a>' +
-      '</div></div>';
-    var count = { '수용': 0, '수정': 0, '제외': 0 };
-    qs.forEach(function (q) { var r = byQ[q.id]; if (r && count[r.decision] != null) count[r.decision]++; });
-
-    out += section('N', '🔍 AI 정보 검증표', '<small>I단계 질문 ' + qs.length + '개 → 검증 ' + qs.length + '줄</small>');
-    out += '<div class="notice info">🔗 I단계 질문과 같은 번호로 한 줄씩 있어요. I단계에서 <b>"우리 말로 정리"</b>를 저장하면 그 줄에 자동으로 들어와요. ' +
-      '이 표에서 AI 정보 문장을 직접 고쳐 저장한 줄은, 그 뒤로 I단계를 고쳐도 덮어쓰지 않아요.</div>';
-    if (qs.length) out += participation('N', g);
-    out += '<div class="vsum" style="margin-bottom:12px">' + DECISIONS.map(function (d) {
-      return '<span class="b-' + d.v + '">' + d.icon + ' ' + d.v + ' ' + count[d.v] + '</span>';
-    }).join('') + '<span class="b-없음">판단 전 ' + (qs.length - count['수용'] - count['수정'] - count['제외']) + '</span></div>';
-
-    if (!qs.length) {
-      out += '<div class="empty">검증할 AI 정보가 없어요. H단계에서 질문을 만들고, I단계에서 AI 답변을 정리해 주세요.</div>';
-    } else {
-      out += '<div class="ph-N"><div class="vhead"><span>#</span><span>AI 정보</span><span>판단</span><span>판단 근거</span><span></span></div>' +
-        qs.map(function (q, i) {
-          var r = byQ[q.id];
-          if (!r) {   // 아직 I단계에서 정리하지 않은 질문
-            return '<div class="vrow vwait"><div class="vnum">' + (i + 1) + '</div>' +
-              '<div class="vwait-msg"><div class="vq">질문: ' + esc(q.text) + myQTag(q) + '</div>' +
-              '⏳ I단계에서 이 질문(Q' + (i + 1) + ')의 <b>"우리 말로 정리"</b>를 먼저 저장해 주세요. 저장하면 여기에 자동으로 들어와요.</div></div>';
-          }
-          var k = 'v.' + r.id;
-          var dec = dv(k + '.decision', r.decision || '');
-          return (S.conflict[k] ? '<div class="vrow vconf">' + conflictBox(k) + '</div>' : '') +
-            '<div class="vrow">' +
-            '<div class="vnum">' + (i + 1) + '</div>' +
-            '<div><label class="lbl">AI 정보</label><div class="vq">질문: ' + esc(q.text) + myQTag(q) + '</div>' +
-            ta(k + '.info', r.info, 'AI가 알려 준 정보', 3) + '</div>' +
-            '<div><label class="lbl">판단</label><div class="decisions">' + DECISIONS.map(function (d) {
-              return '<label class="dec ' + d.cls + '"><input type="radio" name="' + k + '" data-d="' + k + '.decision" value="' + d.v + '"' +
-                (dec === d.v ? ' checked' : '') + '><span>' + d.icon + ' ' + d.v + '</span></label>';
-            }).join('') + '</div></div>' +
-            '<div><label class="lbl">판단 근거</label>' + ta(k + '.reason', r.reason, '왜 그렇게 판단했나요? (교과서, 믿을 만한 자료, 모둠 토의 등)', 3) +
-            (r.updatedBy ? '<small>' + esc(r.updatedBy) + ' · ' + fmt(r.updatedAt || r.createdAt) + '</small>' : '') + '</div>' +
-            '<div class="vactions"><button class="btn small primary" data-act="saveV" data-id="' + r.id + '">저장</button></div>' +
-            '</div>';
-        }).join('') + '</div>';
-    }
-
-    var w = gw(g);
-    out += section('N', '🌟 AI가 제시하지 못한 우리 모둠만의 아이디어');
-    out += '<div class="card accent ph-N">' +
-      conflictBox('uniq.' + g) +
-      ta('uniq.' + g, w.uniqueIdea, 'AI 답변에는 없었지만, 우리 모둠이 토의하며 새로 떠올린 아이디어를 적어요.', 5) +
-      '<div class="btn-row"><button class="btn primary ph-N" data-act="saveUniq">저장</button>' +
-      (w.uniqueIdeaAt ? '<span class="meta">마지막 저장: ' + esc(w.uniqueIdeaBy || '') + ' · ' + fmt(w.uniqueIdeaAt) + '</span>' : '') + '</div>' +
-      '</div>';
+    var g = myGroup(), w = gw(g), out = phaseHead('N', true), assigned = assignedGroups(g);
+    out += section('N', '💬 다른 모둠의 중간 해결안', '<small>' + esc(assigned.join(', ')) + '에 모둠과 상의하여 댓글을 남겨요.</small>');
+    if (w.solution) out += '<div class="card accent ph-N"><h3>우리 모둠이 받은 댓글</h3>' + commentsBlock('N', 'solution', g, false, '다른 모둠이 남긴 댓글') + '</div>';
+    var others = assigned.concat(L().groups.filter(function (x) { return x !== g && assigned.indexOf(x) < 0; }));
+    out += '<div class="grid2">' + others.map(function (og) {
+      var ow = gw(og), chosen = assigned.indexOf(og) >= 0;
+      if (!ow.solution && !chosen) return '';
+      return '<div class="card accent ph-N"><div class="card-head"><span class="avatar ph-N">' + esc(og.replace(/[^0-9]/g, '') || og[0]) + '</span><b>' + esc(og) + '</b>' +
+        '<span class="status">' + (chosen ? '댓글을 남길 모둠' : '보기만 가능') + '</span></div>' +
+        '<div class="result-text ph-N">' + (ow.solution ? nl(ow.solution) : '아직 중간 해결안을 작성하지 않았어요.') + '</div>' +
+        (ow.solution ? commentsBlock('N', 'solution', og, !isTeacher() && chosen) : '') + '</div>';
+    }).join('') + '</div>';
+    out += section('N', '🔄 친구들의 의견 보고 우리 의견 수정하기');
+    out += '<div class="notice info">I단계의 원래 방안은 그대로 보존돼요. 모둠이 상의한 수정안을 오른쪽에 함께 적어 주세요.</div>' +
+      '<div class="revision-layout"><div class="card"><h3>I단계 원래 의견</h3><div class="result-text ph-I">' + orDash(w.solution) + '</div></div>' +
+      '<div class="revision-arrow" aria-hidden="true">→</div><div class="card accent ph-N"><h3>N단계 모둠 수정안</h3>' + conflictBox('rev.' + g) + planEditor(g, 'rev', w) +
+      '<div class="btn-row"><button class="btn primary ph-N" data-act="saveRevision">모둠 수정안 저장</button>' + (w.revisionAt ? '<span class="meta">마지막 저장: ' + esc(w.revisionBy || '') + ' · ' + fmt(w.revisionAt) + '</span>' : '') + '</div></div></div>';
+    if (w.uniqueIdea) out += '<div class="card"><h3>기존에 저장한 우리 모둠 아이디어</h3>' + nl(w.uniqueIdea) + '</div>';
     return out;
   }
 
@@ -892,6 +884,15 @@
   function myTBox(c, title) {
     return '<div class="mine"><h3>💭 ' + (title || '나의 처음 생각 (T단계)') + '</h3>' +
       (c && (c.claim || c.reason || c.solution) ? tCardBody(c) : '<div class="empty">T단계 카드가 없어요.</div>') + '</div>';
+  }
+  function finalForEditor(id) {
+    var saved = S.d.finalsById[id] || {};
+    if (S.classId !== DataStore.TEST_CLASS || saved.stance || saved.reason1 || !window.SAMPLE_DATA) return saved;
+    var example = (window.SAMPLE_DATA().finals || {})[id];
+    if (!example) return saved;
+    var result = Object.assign({}, saved);
+    ['stance','reason1','evidence1','reason2','evidence2','reason3','evidence3'].forEach(function (key) { result[key] = example[key] || ''; });
+    return result;
   }
   function presentationPrompt(g) {
     var members = membersOf(g), w = gw(g), qs = groupQs(g), rows = groupVerify(g);
@@ -907,7 +908,7 @@
       'T 처음 의견: 학생마다 별도의 작은 네모 카드 하나씩 만들고 가로 한 줄에 나란히 배치하세요. 모든 학생 카드의 배경색·테두리색·이름표색은 각각 동일한 T 주황 계열로 완전히 통일하세요. 학생마다 다른 색이나 밝기를 쓰지 마세요. 각 카드에는 학생 이름과 핵심 주장·근거·보완방안을 간결하게 담으세요.',
       '필수 질문·답변 배치: 질문마다 아래 구조를 독립된 한 줄로 그리세요. [질문 번호 배지 + 그 번호의 질문만 들어 있는 노란 네모] → [같은 번호 배지 + 그 질문에 대한 우리 말 답변과 검증 결과만 들어 있는 청록·파란 네모]. 질문과 답변 상자 사이에는 화살표를 그리세요. 질문이 4개면 4행과 8개의 독립된 상자, 4개의 화살표를 사용합니다. 모든 질문을 한 상자에 모으거나 모든 답변을 다른 상자에 모으지 마세요.',
       'K 모둠 결과와 산출 방안: 맨 아래 보라 계열의 넓은 상자 두 개에 각각 담고, 본문 중에서는 가장 눈에 띄게 하되 지나치게 크거나 빽빽하지 않게 쓰세요. 모둠 결과가 중간 해결안이면 최종 합의라고 단정하지 마세요.',
-      'AI 답변은 검증 전의 내용입니다. 포스터에는 N단계에서 수용하거나 수정한 내용과 판단 근거를 우선 사용하세요. N단계에서 제외하거나 수정한 잘못된 정보는 사실처럼 쓰지 마세요.',
+      'AI 답변은 검토 전의 내용입니다. 포스터에는 I단계에서 수용할 부분을 우선 사용하고, 제외할 부분이나 검증되지 않은 내용은 사실처럼 쓰지 마세요.',
       '의견이 달랐던 과정과 변화가 보이게 하되 자료에 없는 사실이나 합의는 만들지 마세요.',
       '정보가 없으면 ‘아직 작성하지 않음’으로 표시하고 제공된 모둠원 이름만 사용하세요. 이름 이외의 개인정보는 포스터에 넣지 마세요.',
       '', '[반드시 따를 도식]', '제목 → 학생별 이름표가 있는 처음 의견 카드 ' + members.length + '개',
@@ -923,12 +924,11 @@
     lines.push('', '[질문별 우리 말 답변과 검증 결과]');
     qs.forEach(function (q, i) {
       var a = S.d.aianswersById[q.id] || {};
-      var v = rows.filter(function (row) { return row.source === q.id; })[0];
       lines.push('[' + (i + 1) + '번 질문 상자] ' + q.text + '\n→ [' + (i + 1) + '번 답변·검증 상자] 우리 말로 정리한 답변: ' + (a.summary || '미작성') +
-        ' / 검증 결과: ' + (v ? (v.info || '정보 미작성') + ' / 판단: ' + (v.decision || '미작성') + ' / 근거: ' + (v.reason || '미작성') : '미작성'));
+        ' / 수용할 부분: ' + (a.accept || '미작성') + ' / 제외할 부분: ' + (a.exclude || '미작성') + ' / 검증되지 않은 부분: ' + (a.uncertain || '미작성'));
     });
     lines.push('', '모둠의 결과 (I단계에서 저장한 중간 해결안): ' + (w.solution || '미작성'));
-    lines.push('모둠에서 산출한 방안 (N단계 우리 모둠만의 아이디어): ' + (w.uniqueIdea || '미작성'));
+    lines.push('모둠의 수정안 (N단계): ' + (w.revision || '미작성'));
     return lines.join('\n');
   }
   function renderK() {
@@ -949,16 +949,20 @@
       return out;
     }
 
-    var f = S.d.finalsById[me().id] || {};
+    var f = finalForEditor(me().id), work = gw(myGroup());
+    out += section('K', '💭 나의 생각과 모둠의 해결안 돌아보기');
+    out += '<div class="k-reference-grid"><div class="k-reference k-reference-t"><h3>🟠 처음의 나의 생각 · T</h3>' +
+      (S.d.tcardsById[me().id] ? tCardBody(S.d.tcardsById[me().id]) : '<div class="empty">아직 T단계 생각이 없어요.</div>') + '</div>' +
+      '<div class="k-reference k-reference-n"><h3>🔵 모둠이 생각해 낸 해결책 · N</h3>' +
+      (work.revision ? orDash(work.revision) : (work.solution ? '<small>I단계 중간 해결안 · N단계 수정안 저장 전</small>' + orDash(work.solution) : '<div class="empty">아직 저장된 모둠 해결안이 없어요.</div>')) + '</div></div>';
     out += section('K', '🏁 최종 결과물');
-    out += '<div class="card accent ph-K">' +
-      '<p><b>유전자 조작 기술은 인간에게</b> 나의 입장을 선택해요.</p><div class="decisions">' + ['축복', '재앙'].map(function (choice) {
+    out += '<div class="notice k-personal-guide"><b>수업을 진행하면서 바뀐 나의 생각을 포함하여 최종 결과를 작성해 보세요.</b><br><strong>나의 의견은 모둠의 의견과 달라도 괜찮아요. 개인별로 작성해요.</strong></div>' +
+      '<div class="card accent ph-K">' +
+      '<p><b>나의 입장을 선택해요.</b></p><div class="k-stance"><b>유전자 조작기술은 인간에게</b> <span class="decisions">' + ['축복', '재앙'].map(function (choice) {
         return '<label class="dec"><input type="radio" name="kstance" data-d="K.stance" value="' + choice + '"' + (dv('K.stance', f.stance) === choice ? ' checked' : '') + '><span>' + choice + '</span></label>';
-      }).join('') + '</div>' +
+      }).join(' <span>/</span> ') + '</span> <b>이다.</b></div>' +
       '<p class="meta">이유와 그 이유를 뒷받침하는 근거나 사례를 짝지어 적어요. 최대 3가지까지 작성할 수 있어요.</p>' +
-      [1, 2, 3].map(function (i) { return '<div class="k-reason"><b>이유 ' + i + '</b><div class="k-reason-grid"><div><label class="lbl">이유 ' + i + ' · ~하기 때문이다</label>' + ta('K.reason' + i, f['reason' + i], '왜 그렇게 생각하나요?', 3) + '</div><div><label class="lbl">근거·예시·사례</label>' + ta('K.evidence' + i, f['evidence' + i], '이유를 뒷받침하는 근거나 사례를 적어요.', 3) + '</div></div></div>'; }).join('') +
-      (f.text && !f.stance && !f.reason1 ? '<label class="lbl">이전에 작성한 최종 결과물</label>' + ta('K.text', f.text, '', 5) : '') +
-      (f.legacyText ? '<label class="lbl">이전에 작성한 최종 결과물</label><div class="notice">' + nl(f.legacyText) + '</div>' : '') +
+      [1, 2, 3].map(function (i) { return '<div class="k-reason"><label class="lbl">이유 ' + i + '</label>' + ta('K.reason' + i, f['reason' + i], '~하기 때문이다.', 2) + '<label class="lbl">이유 ' + i + '의 근거·예시·사례</label>' + ta('K.evidence' + i, f['evidence' + i], '이유를 뒷받침하는 근거나 사례를 적어요.', 3) + '</div>'; }).join('') +
       '<div class="btn-row"><button class="btn primary ph-K" data-act="saveFinal">저장</button>' +
       (f.updatedAt ? '<span class="meta">마지막 저장 ' + fmt(f.updatedAt) + '</span>' : '') + '</div>' +
       '</div>';
@@ -1045,12 +1049,8 @@
         return '<li><b>' + esc(q.text) + '</b><br>' + (a.summary ? nl(a.summary) + ' <small>(' + esc(a.tool || 'AI') + (a.hasSource ? ', 출처 있음' : ', 출처 없음') + ')</small>' : '<small>아직 정리 전</small>') + '</li>';
       }).join('') + '</ol>' : '<small>아직 없음</small>') +
       '<div class="sub">🧩 모둠 중간 해결안</div>' + orDash(w.solution);
-    var nBody = '<div class="sub">🔍 검증 결과</div>' +
-      (rows.length ? '<ul class="mini-list" style="list-style:none;padding:0">' + rows.map(function (r) {
-        return '<li><span class="badge-dec b-' + (r.decision || '없음') + '">' + (r.decision || '판단 전') + '</span>' + esc(r.info) +
-          (r.reason ? '<br><small>근거: ' + esc(r.reason) + '</small>' : '') + '</li>';
-      }).join('') + '</ul>' : '<small>아직 없음</small>') +
-      '<div class="sub">🌟 우리 모둠만의 아이디어</div>' + orDash(w.uniqueIdea);
+    var nBody = '<div class="sub">💬 다른 모둠에게 받은 의견</div>' + commentsOn('N', 'solution', g).map(commentTable).join('') +
+      '<div class="sub">🔄 모둠 수정안</div>' + orDash(w.revision);
     var kBody = '<div class="sub">🏁 최종 결과물</div>' + orDash(f.text) +
       KFIELDS.map(function (x) { return '<div class="sub">' + x.label + '</div>' + orDash(f[x.f]); }).join('');
 
@@ -1087,9 +1087,7 @@
         '<div><div class="sub" style="font-weight:800;color:var(--h)">H · AI 질문 ' + qs.length + '개</div>' +
         (qs.length ? '<ol class="mini-list">' + qs.map(function (q) { return '<li>' + esc(q.text) + '</li>'; }).join('') + '</ol>' : '<small>없음</small>') + '</div>' +
         '<div><div class="sub" style="font-weight:800;color:var(--i)">I · 답변 정리 ' + answered + '/' + qs.length + ' · 중간 해결안</div>' + orDash(w.solution) + '</div>' +
-        '<div><div class="sub" style="font-weight:800;color:var(--n)">N · 검증 ' + rows.length + '행</div>' +
-        '<div class="vsum">' + DECISIONS.map(function (d) { return '<span class="b-' + d.v + '">' + d.v + ' ' + cnt[d.v] + '</span>'; }).join('') + '</div></div>' +
-        '<div><div class="sub" style="font-weight:800;color:var(--n)">N · 우리 모둠만의 아이디어</div>' + orDash(w.uniqueIdea) + '</div>' +
+        '<div><div class="sub" style="font-weight:800;color:var(--n)">N · 모둠 수정안</div>' + orDash(w.revision) + '</div>' +
         '</div></div>' +
         (mem.length ? '<div class="table-wrap"><table class="data"><thead><tr><th>이름</th><th>T 초기 주장</th><th>H 댓글<br>(쓴/받은)</th><th>K 최종 결과물</th><th>K 바뀐 생각</th><th></th></tr></thead><tbody>' +
           mem.map(function (s) {
@@ -1111,7 +1109,7 @@
     return L().groups.map(function (g) {
       var qs = groupQs(g), rows = groupVerify(g);
       var answered = qs.filter(function (q) { var a = S.d.aianswersById[q.id]; return a && (a.summary || a.answer); }).length;
-      var judged = rows.filter(function (r) { return r.decision && r.reason; }).length;
+      var judged = qs.filter(function (q) { var a = S.d.aianswersById[q.id] || {}; return a.accept || a.exclude || a.uncertain; }).length;
       return { g: g, qs: qs, rows: rows, answered: answered, judged: judged, mem: membersOf(g) };
     });
   }
@@ -1163,12 +1161,12 @@
       '<div class="stat ph-T"><b>' + tDone + '/' + all.length + '</b><span>T 카드 제출</span></div>' +
       '<div class="stat ph-H"><b>' + qTotal + '</b><span>H AI 질문 수</span></div>' +
       '<div class="stat ph-I"><b>' + aTotal + '/' + qTotal + '</b><span>I 답변 기록</span></div>' +
-      '<div class="stat ph-N"><b>' + vTotal + '</b><span>N 판단 완료 행</span></div>' +
+      '<div class="stat ph-I"><b>' + vTotal + '</b><span>I 답변 검토 수</span></div>' +
       '<div class="stat ph-K"><b>' + kDone + '/' + all.length + '</b><span>K 최종 결과물</span></div></div>';
-    out += '<div class="table-wrap"><table class="data"><thead><tr><th>접속</th><th>이름</th><th>T 카드</th><th>H 댓글 쓴 수</th><th>H 질문</th><th>I 답변 기록</th><th>N 검증</th><th>K 최종</th><th>K 성찰</th></tr></thead><tbody>' +
+    out += '<div class="table-wrap"><table class="data"><thead><tr><th>접속</th><th>이름</th><th>T 카드</th><th>H 댓글 쓴 수</th><th>H 질문</th><th>I 답변 기록</th><th>N 모둠 수정안</th><th>K 최종</th><th>K 성찰</th></tr></thead><tbody>' +
       prog.map(function (p) {
-        return '<tr class="grp"><td colspan="9">' + esc(p.g) + ' · ' + p.mem.length + '명 · 질문 ' + p.qs.length + '개 · AI 답변 ' + p.answered + '/' + p.qs.length + ' · 검증 판단 ' + p.judged + '/' + p.qs.length + ' · 중간 해결안 ' + (gw(p.g).solution ? '✅' : '—') +
-          ' · 우리 아이디어 ' + (gw(p.g).uniqueIdea ? '✅' : '—') + '</td></tr>' +
+        return '<tr class="grp"><td colspan="9">' + esc(p.g) + ' · ' + p.mem.length + '명 · 질문 ' + p.qs.length + '개 · AI 답변 ' + p.answered + '/' + p.qs.length + ' · I 답변 검토 ' + p.judged + '/' + p.qs.length + ' · 중간 해결안 ' + (gw(p.g).solution ? '✅' : '—') +
+          ' · 모둠 수정안 ' + (gw(p.g).revision ? '✅' : '—') + '</td></tr>' +
           (p.mem.length ? p.mem.map(function (s) {
             var c = S.d.tcardsById[s.id], f = S.d.finalsById[s.id] || {};
             var wr = S.d.comments.filter(function (x) { return x.authorId === s.id; }).length;
@@ -1403,10 +1401,10 @@
     addComment: function (el) {
       var phase = el.dataset.phase, tt = el.dataset.tt, tid = el.dataset.tid;
       var prefix = 'c.' + phase + '.' + tt + '.' + tid;
-      var fields = L().commentFields[phase].map(function (label, i) { return { label: label, value: take(prefix + '.' + i) }; });
+      var fields = (phase === 'N' ? GROUP_COMMENT_FIELDS : L().commentFields[phase]).map(function (label, i) { return { label: label, value: take(prefix + '.' + i) }; });
       if (fields.some(function (f) { return !f.value; })) return toast('표의 모든 칸을 채워 주세요');
-      if (phase === 'I' && (isTeacher() || tt !== 'solution' || assignedGroups(myGroup()).indexOf(tid) < 0)) return toast('지정된 모둠에만 댓글을 남길 수 있어요.');
-      if (phase === 'I' && fields.some(function (f) { return f.value.replace(/\s/g, '').length < 10; })) return toast('각 칸을 공백 제외 10자 이상 작성해 주세요.');
+      if (phase === 'N' && (isTeacher() || tt !== 'solution' || assignedGroups(myGroup()).indexOf(tid) < 0)) return toast('지정된 모둠에만 댓글을 남길 수 있어요.');
+      if (phase === 'N' && fields.some(function (f) { return f.value.replace(/\s/g, '').length < 10; })) return toast('각 칸을 공백 제외 10자 이상 작성해 주세요.');
       if (phase === 'H' && commentsOn(phase, tt, tid).length >= MAX_H_COMMENTS) return toast('이미 이 글에 댓글이 2개 달렸어요');
       clearDrafts(prefix);
       return DataStore.addComment({
@@ -1457,6 +1455,8 @@
     /* I */
     saveAI: function (el) {
       var id = el.dataset.id, a = S.d.aianswersById[id] || {}, k = 'ai.' + id;
+      var question = S.d.questionsById[id];
+      if (isTeacher() || !question || question.group !== myGroup() || !isMyQ(question)) return toast('내가 작성한 질문만 기록할 수 있어요.');
       var data = {
         group: myGroup(),
         answer: take(k + '.answer', a.answer),
@@ -1464,31 +1464,39 @@
         hasSource: !!dv(k + '.hasSource', !!a.hasSource),
         sourceNote: take(k + '.sourceNote', a.sourceNote),
         summary: take(k + '.summary', a.summary),
+        accept: take(k + '.accept', a.accept), exclude: take(k + '.exclude', a.exclude), uncertain: take(k + '.uncertain', a.uncertain),
         updatedBy: me().name, updatedAt: Date.now()
       };
       data['c_' + me().id] = Date.now();   // 참여 기록 (한 명당 1개 이상 확인용)
-      var g = myGroup();
       return okToSave(k).then(function (ok) {
         if (!ok) return;
         clearDrafts(k);
-        return saveShared(k, 'aianswers', id, data)
-          .then(function () { return refresh(true); })
-          .then(function () { return syncVerify(g); })
-          .then(function (n) { return done(n ? 'AI 답변을 저장했어요 · N단계 검증표에도 반영됐어요' : 'AI 답변 기록을 저장했어요'); });
+        return saveShared(k, 'aianswers', id, data).then(function () { return done('AI 답변과 검토 내용을 저장했어요'); });
       });
     },
     saveSol: function () {
       var g = myGroup();
-      var text = take('sol.' + g, gw(g).solution);
+      if (isTeacher()) return;
+      var prefix = 'sol.' + g, result = planData(prefix, 'mid', gw(g));
       return okToSave('sol.' + g).then(function (ok) {
         if (!ok) return;
         clearDrafts('sol.' + g);
-        return saveShared('sol.' + g, 'groupwork', g, { solution: text, solutionBy: me().name, solutionAt: Date.now() })
+        return saveShared(prefix, 'groupwork', g, Object.assign(result.data, { solution: result.text, solutionBy: me().name, solutionAt: Date.now() }))
           .then(function () { return done('중간 해결안을 저장했어요'); });
       });
     },
 
     /* N */
+    saveRevision: function () {
+      if (isTeacher()) return;
+      var g = myGroup(), prefix = 'rev.' + g, result = planData(prefix, 'rev', gw(g));
+      return okToSave(prefix).then(function (ok) {
+        if (!ok) return;
+        clearDrafts(prefix);
+        return saveShared(prefix, 'groupwork', g, Object.assign(result.data, { revision: result.text, revisionBy: me().name, revisionAt: Date.now() }))
+          .then(function () { return done('모둠 수정안을 저장했어요'); });
+      });
+    },
     saveV: function (el) {
       var id = el.dataset.id, r = S.d.verifyById[id] || {}, k = 'v.' + id;
       var data = {
@@ -1521,8 +1529,9 @@
     /* K */
     saveFinal: function () {
       var f = S.d.finalsById[me().id] || {};
-      var data = { stance: take('K.stance', f.stance), updatedAt: Date.now() };
-      [1, 2, 3].forEach(function (i) { data['reason' + i] = take('K.reason' + i, f['reason' + i]); data['evidence' + i] = take('K.evidence' + i, f['evidence' + i]); });
+      var shown = finalForEditor(me().id);
+      var data = { stance: take('K.stance', shown.stance), updatedAt: Date.now() };
+      [1, 2, 3].forEach(function (i) { data['reason' + i] = take('K.reason' + i, shown['reason' + i]); data['evidence' + i] = take('K.evidence' + i, shown['evidence' + i]); });
       var hasStructure = data.stance || [1, 2, 3].some(function (i) { return data['reason' + i] || data['evidence' + i]; });
       if (hasStructure) {
         data.text = (data.stance ? '유전자 조작 기술은 인간에게 ' + data.stance + '이다.\n' : '') + [1, 2, 3].map(function (i) { return data['reason' + i] || data['evidence' + i] ? '이유 ' + i + ': ' + (data['reason' + i] || '미작성') + '\n근거·사례: ' + (data['evidence' + i] || '미작성') : ''; }).filter(Boolean).join('\n');
@@ -1657,7 +1666,7 @@
     },
     exportCSV: function () {
       var header = ['모둠', '이름', 'T 초기 주장', 'T 근거', 'T 보완방안', 'T 제출', 'H 모둠 AI 질문', 'H 쓴 댓글 수', 'H 받은 댓글 수',
-        'I AI 답변 기록(도구/출처/우리 말 정리)', 'I 모둠 중간 해결안', 'N 검증표', 'N 우리 모둠만의 아이디어',
+        'I AI 답변 기록(도구/출처/우리 말 정리)', 'I 모둠 중간 해결안', 'I AI 답변 검토', 'N 모둠 수정안',
         'K 최종 결과물'].concat(KFIELDS.map(function (x) { return 'K ' + x.label; }));
       var rows = [header];
       L().groups.concat(S.d.students.map(function (s) { return s.group; }))
@@ -1669,13 +1678,13 @@
             var a = S.d.aianswersById[q.id];
             return a ? 'Q' + (i + 1) + ' [' + (a.tool || 'AI') + ' / 출처 ' + (a.hasSource ? '있음' : '없음') + '] ' + (a.summary || '') : '';
           }).filter(Boolean).join('\n');
-          var vText = groupVerify(g).map(function (r) { return '[' + (r.decision || '판단 전') + '] ' + r.info + (r.reason ? ' — 근거: ' + r.reason : ''); }).join('\n');
+          var vText = qs.map(function (q, i) { var a = S.d.aianswersById[q.id] || {}; return 'Q' + (i + 1) + ' 수용: ' + (a.accept || '') + ' / 제외: ' + (a.exclude || '') + ' / 미검증: ' + (a.uncertain || ''); }).join('\n');
           membersOf(g).forEach(function (s) {
             var c = S.d.tcardsById[s.id] || {}, f = S.d.finalsById[s.id] || {};
             rows.push([g, s.name, c.claim, c.reason, c.solution, c.submitted ? '제출 ' + fmt(c.submittedAt) : '미제출', qText,
               S.d.comments.filter(function (x) { return x.authorId === s.id; }).length,
               commentsOn('H', 'tcard', s.id).length,
-              aText, w.solution, vText, w.uniqueIdea, f.text].concat(KFIELDS.map(function (x) { return f[x.f]; })));
+              aText, w.solution, vText, w.revision, f.text].concat(KFIELDS.map(function (x) { return f[x.f]; })));
           });
         });
       downloadCSV('THINK_' + S.classId + '_학생기록_' + today() + '.csv', rows);

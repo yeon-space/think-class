@@ -287,8 +287,8 @@ window.SAMPLE_DATA = function () {
         prompts: {
           T: '유전자 조작 기술은 인간에게 축복일까요, 재앙일까요? AI를 사용하지 않고 나의 생각을 먼저 정리해 봅시다.',
           H: '모둠 친구들의 생각을 읽고 표 양식으로 댓글을 남긴 뒤, AI에게 물어볼 질문을 함께 만들어 봅시다.',
-          I: '우리가 만든 질문을 AI에게 묻고 답변을 기록한 뒤 우리 말로 정리해 봅시다. 그리고 모둠 중간 해결안을 작성해 봅시다.',
-          N: 'AI가 준 정보를 그대로 믿어도 될까요? 정보마다 수용·수정·제외를 판단하고 근거를 적어 봅시다.',
+          I: '내 질문의 AI 답변을 기록하고 직접 검토한 뒤 모둠 중간 해결안을 작성해 봅시다.',
+          N: '다른 모둠과 의견을 나누고 우리 모둠의 해결안을 함께 수정해 봅시다.',
           K: '처음 생각과 지금 생각을 비교하며 최종 결과물을 완성하고 성찰해 봅시다.'
         },
         commentFields: {
@@ -422,11 +422,14 @@ window.SAMPLE_DATA = function () {
 
     /* K 최종 결과물 + 성찰 */
     mem.forEach(function (id, k) {
-      if (K_NOT[id]) return;
       var stance = st.t[k][0], R = REFLECT[stance], v = (g + k) % 2;
       var f = {
         text: st.final + '\n\n' + ['나는 특히 우리 모둠 아이디어인 "' + st.idea.split('"')[1] + '"가 꼭 필요하다고 생각한다.',
                                    '이를 위해 과학자, 정부, 시민이 함께 기준을 정하고 결과를 공개해야 한다.'][v],
+        stance: stance === 'curse' ? '재앙' : stance === 'bless' ? '축복' : '',
+        reason1: st.t[k][2], evidence1: st.qa[0][2],
+        reason2: '활용할 때 생길 수 있는 문제를 살펴보아야 하기 때문이다.', evidence2: st.v[0][1],
+        reason3: '기술을 더 안전하고 책임 있게 활용해야 하기 때문이다.', evidence3: st.idea,
         updatedAt: t(12 - g - k * 0.2)
       };
       if (!K_HALF[id]) {
@@ -454,12 +457,12 @@ window.SAMPLE_DATA = function () {
       var tg = (g + step) % 8, author = ids[g * 4 + (j * 2 + g) % 4];
       var ts = STORY[tg];
       addComment({
-        phase: 'I', targetType: 'solution', targetId: GROUPS[tg], targetGroup: GROUPS[tg],
+        phase: 'N', targetType: 'solution', targetId: GROUPS[tg], targetGroup: GROUPS[tg],
         authorId: author, authorName: sname(author), authorGroup: GROUPS[g], createdAt: t(33 - g - j),
         fields: [
-          { label: '나와 비슷한 점', value: '우리 모둠도 "' + st.key + '"를 다루면서 규칙과 신중함이 필요하다고 정리했어.' },
-          { label: '다른 점', value: DIFFERENCES[(g * 2 + j) % DIFFERENCES.length] },
-          { label: '잘한 점', value: ['누가 결정하는지까지 정한 점이 구체적이야.', '실제 사례를 근거로 써서 설득력이 있어.', '시민 참여를 넣은 점이 좋았어.', '단계별로 넓혀 가는 방법이 현실적이야.'][(g + j) % 4] }
+          { label: '👍 이 방안이 좋은 이유', value: '문제의 이점과 우려를 함께 살펴보고 실천할 방향을 제시해서 좋아.' },
+          { label: '💡 추가하면 좋을 요소', value: ['시행할 때 누가 참여하고 어떤 기준으로 결정할지 더 구체적으로 적으면 좋겠어.', '방안을 적용한 뒤 생기는 변화를 어떻게 점검할지 구체적으로 적으면 좋겠어.'][(g + j) % 2] },
+          { label: '🔍 한 번 더 살펴봐야 하는 부분 (사실·과학적 오류)', value: '방안에 들어간 과학적 사실과 효과를 믿을 만한 자료로 다시 확인하면 좋겠어.' }
         ]
       });
     });
