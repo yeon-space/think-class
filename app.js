@@ -177,7 +177,8 @@
   function gw(g) { return S.d.groupworkById[g] || {}; }
   function commentsOn(phase, tt, tid) {
     return S.d.comments.filter(function (c) {
-      return (c.phase === phase || (phase === 'N' && c.phase === 'I' && tt === 'solution')) && c.targetType === tt && c.targetId === tid;
+      return c.phase === phase && c.targetType === tt && c.targetId === tid &&
+        (phase !== 'N' || ((c.fields || []).length === 3 && c.fields.every(function (f, i) { return f.label === GROUP_COMMENT_FIELDS[i]; })));
     }).sort(byTime);
   }
   function isOnline(id) { return S.presence.some(function (p) { return p.id === id; }); }
@@ -644,12 +645,9 @@
   function commentsBlock(phase, tt, tid, canWrite, title) {
     var list = commentsOn(phase, tt, tid);
     var limited = phase === 'H', full = limited && list.length >= MAX_H_COMMENTS;
-    var current = phase === 'N' ? list.filter(function (c) { return (c.fields || []).length === 3 && c.fields.every(function (f, i) { return f.label === GROUP_COMMENT_FIELDS[i]; }); }) : list;
-    var older = phase === 'N' ? list.filter(function (c) { return current.indexOf(c) < 0; }) : [];
     return '<div class="comments">' +
       '<div class="ctitle">' + (title || '댓글') + ' ' + list.length + (limited ? '/' + MAX_H_COMMENTS : '') + '개</div>' +
-      current.map(commentTable).join('') +
-      (older.length ? '<details class="legacy-comments"><summary>이전에 남긴 댓글 보기 (' + older.length + '개)</summary><small>이전 댓글은 작성 당시의 항목명으로 보존돼요.</small>' + older.map(commentTable).join('') + '</details>' : '') +
+      list.map(commentTable).join('') +
       (full ? '<div class="clock">🔒 댓글 ' + MAX_H_COMMENTS + '개가 모두 찼어요. 아직 댓글이 적은 다른 친구 카드에 남겨 주세요.</div>'
             : (canWrite ? commentForm(phase, tt, tid) : '')) +
       '</div>';

@@ -497,7 +497,6 @@ table.data tr.grp td { background: #FBF8F3; font-weight: 800; color: var(--muted
 .source-links .source-warning { color: #a33e37; background: #fff5f2; border-left: 3px solid #d87565; padding: 8px 10px; border-radius: 4px; }
 .review-icon { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; color: white; font-weight: 800; margin-right: 4px; }
 .review-ok { background: #318653; } .review-no { background: #c9504a; } .review-unknown { background: #ba871e; }
-.legacy-comments { margin: 10px 0; } .legacy-comments summary { cursor: pointer; color: #625978; }
 .k-reason { margin: 16px 0; padding: 14px; border: 1px solid #e3d5ef; border-radius: 12px; background: #faf7fd; }
 .k-reason-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .poster-steps { padding-left: 24px; line-height: 1.9; }
