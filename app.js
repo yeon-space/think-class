@@ -54,6 +54,8 @@
     flowStudent: null,
     cfEdit: {},          // 댓글 양식 편집 중인 값
     presence: [],
+    commentLeases: {},
+    commentLeaseActivity: {},
     classId: null,       // 지금 반
     classes: [],         // 반 목록
     syncing: 0,          // 서버로 보내는 중인 저장 개수
@@ -655,10 +657,19 @@
     var list = commentsOn(phase, tt, tid);
     var limited = phase === 'H' || phase === 'N', full = limited && list.length >= MAX_H_COMMENTS;
     var groupAlreadyWrote = phase === 'N' && !isTeacher() && list.some(function (c) { return c.authorGroup === myGroup(); });
+    var myLease = phase === 'N' && S.commentLeases[tid];
+    var active = phase === 'N' ? (gw(tid).nCommentLeases || []).filter(function (x) { return x.until > Date.now() && !list.some(function (c) { return c.authorGroup === x.group; }); }) : [];
+    var busy = phase === 'N' && !myLease && list.length + active.length >= MAX_H_COMMENTS;
+    if (busy) {
+      var nextExpiry = Math.min.apply(null, active.map(function (x) { return x.until; }));
+      if (isFinite(nextExpiry)) setTimeout(function () { if (S.tab === 'N') refresh(false); }, Math.max(1000, nextExpiry - Date.now() + 500));
+    }
     return '<div class="comments">' +
       '<div class="ctitle">' + (title || '댓글') + ' ' + list.length + (limited ? '/' + MAX_H_COMMENTS : '') + '개</div>' +
       (groupAlreadyWrote && canWrite ? '<div class="clock">✅ 우리 모둠이 이미 댓글을 남겼어요.</div>' : full && canWrite ? '<div class="clock">🔒 ' + (phase === 'N' ? '댓글 두 개가 모두 달렸어요. 다른 모둠에게 달아주세요.' : '댓글 2개가 모두 찼어요. 아직 댓글이 적은 다른 친구 카드에 남겨 주세요.') + '</div>'
-            : (!full && canWrite ? commentForm(phase, tt, tid) : '')) +
+            : busy && canWrite ? '<div class="clock">⏳ 다른 모둠이 댓글을 작성 중이라 두 자리가 모두 찼어요. 지정된 다른 모둠을 확인해 주세요.</div>'
+            : (!full && canWrite && phase === 'N' && !myLease ? '<button class="btn ph-N" data-act="startGroupComment" data-tid="' + esc(tid) + '">✍️ 댓글 작성하기</button>'
+            : (!full && canWrite ? commentForm(phase, tt, tid) + (phase === 'N' ? '<button class="btn small ghost" data-act="cancelGroupComment" data-tid="' + esc(tid) + '">댓글 작성 취소</button>' : '') : ''))) +
       list.map(commentTable).join('') +
       '</div>';
   }
@@ -1423,11 +1434,15 @@
       toast('글을 직접 선택해 복사해 주세요.');
     },
     tab: function (el) {
+      if (S.tab === 'N' && el.dataset.tab !== 'N') {
+        Object.keys(S.commentLeases).forEach(function (tid) { var token=S.commentLeases[tid]; delete S.commentLeases[tid]; DataStore.releaseGroupComment(tid,token).catch(function () {}); });
+      }
       S.tab = el.dataset.tab; S.flowStudent = null; S.editingQ = null;
       render();
       syncVerifyAndRefresh();
     },
     logout: function () {
+      Object.keys(S.commentLeases).forEach(function (tid) { var token=S.commentLeases[tid]; delete S.commentLeases[tid]; DataStore.releaseGroupComment(tid,token).catch(function () {}); });
       if (S.user) DataStore.clearPresence(S.user.id);
       return setUser(null);
     },
@@ -1466,6 +1481,17 @@
     },
 
     /* 댓글 */
+    startGroupComment: function (el) {
+      var tid=el.dataset.tid;
+      if (isTeacher() || assignedGroups(myGroup()).indexOf(tid)<0) return toast('지정된 모둠에만 댓글을 남길 수 있어요.');
+      var token='lease_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2);
+      return DataStore.reserveGroupComment(tid,myGroup(),token).then(function () { S.commentLeases[tid]=token; S.commentLeaseActivity[tid]=Date.now(); return refresh(true); });
+    },
+    cancelGroupComment: function (el) {
+      var tid=el.dataset.tid, token=S.commentLeases[tid];
+      if (!token) return;
+      return DataStore.releaseGroupComment(tid,token).then(function () { delete S.commentLeases[tid]; delete S.commentLeaseActivity[tid]; clearDrafts('c.N.solution.'+tid); return done('댓글 작성을 취소했어요.'); });
+    },
     addComment: function (el) {
       var phase = el.dataset.phase, tt = el.dataset.tt, tid = el.dataset.tid;
       var prefix = 'c.' + phase + '.' + tt + '.' + tid;
@@ -1481,12 +1507,20 @@
         if (written.length >= 2) return toast('이미 서로 다른 친구 두 명에게 댓글을 남겼어요.');
       }
       clearDrafts(prefix);
-      return DataStore.addComment({
+      var comment = {
         phase: phase, targetType: tt, targetId: tid,
         targetGroup: tt === 'tcard' ? ((S.d.studentsById[tid] || {}).group || '') : tid,
         authorId: me().id, authorName: me().name, authorGroup: me().group || '',
         fields: fields, createdAt: Date.now()
-      }).then(function () { return done('댓글을 등록했어요'); });
+      };
+      var lease = phase === 'N' && S.commentLeases[tid];
+      if (phase === 'N' && !lease) return toast('댓글 작성하기를 먼저 눌러 주세요.');
+      return (lease ? DataStore.reserveGroupComment(tid,myGroup(),lease) : Promise.resolve()).then(function () { return DataStore.addComment(comment); }).then(function () {
+        if (!lease) return done('댓글을 등록했어요');
+        delete S.commentLeases[tid];
+        delete S.commentLeaseActivity[tid];
+        return DataStore.releaseGroupComment(tid,lease).catch(function () {}).then(function () { return done('댓글을 등록했어요'); });
+      });
     },
     delComment: function (el) {
       return ask({ title: '댓글 삭제', msg: '이 댓글을 삭제할까요?', ok: '삭제', danger: true }).then(function (yes) {
@@ -1787,7 +1821,7 @@
   function actionError(err) {
     if(err.code === 'conflict-handled') return;
     console.error(err);
-    toast(err.code === 'comment-limit' ? '이미 이 글에 댓글이 2개 달렸어요' : err.code === 'duplicate-group' ? '우리 모둠이 이미 댓글을 남겼어요.' : err.code === 'writer-limit' ? '이미 서로 다른 친구 두 명에게 댓글을 남겼어요.' : err.code === 'duplicate-target' ? '다른 친구에게 댓글을 하나씩 남겨 주세요.' : '저장하지 못했어요. 작성한 글은 남아 있어요. 연결을 확인하고 다시 저장해 주세요.');
+    toast(err.code === 'comment-busy' ? '다른 모둠이 댓글을 작성 중이라 자리가 찼어요. 지정된 다른 모둠을 확인해 주세요.' : err.code === 'comment-limit' ? '이미 이 글에 댓글이 2개 달렸어요' : err.code === 'duplicate-group' ? '우리 모둠이 이미 댓글을 남겼어요.' : err.code === 'writer-limit' ? '이미 서로 다른 친구 두 명에게 댓글을 남겼어요.' : err.code === 'duplicate-target' ? '다른 친구에게 댓글을 하나씩 남겨 주세요.' : '저장하지 못했어요. 작성한 글은 남아 있어요. 연결을 확인하고 다시 저장해 주세요.');
   }
   function runAction(fn, el) {
     if(activeAction) { toast('처리 중이에요. 잠시 기다려 주세요.'); return; }
@@ -1811,6 +1845,8 @@
 
   document.addEventListener('input', function (e) {
     var t = e.target;
+    var commentInput = /^c\.N\.solution\.(.+)\.\d+$/.exec((t.dataset && t.dataset.d) || '');
+    if (commentInput && S.commentLeases[commentInput[1]]) S.commentLeaseActivity[commentInput[1]] = Date.now();
     if (t.dataset && t.dataset.d !== undefined) {
       noteEditStart(t.dataset.d);
       if (t.type === 'checkbox') S.drafts[t.dataset.d] = t.checked;
@@ -1944,6 +1980,12 @@
       loadPresence();
       setInterval(heartbeat, DataStore.HEARTBEAT_MS);
       setInterval(loadPresence, 30000);
+      setInterval(function () {
+        if (!S.user || isTeacher() || S.tab !== 'N') return;
+        Object.keys(S.commentLeases).forEach(function (tid) {
+          if (Date.now() - (S.commentLeaseActivity[tid] || 0) < 120000) DataStore.reserveGroupComment(tid,myGroup(),S.commentLeases[tid]).catch(function () { toast('댓글 작성 자리를 다시 확인하지 못했어요. 등록할 때 연결을 확인해 주세요.'); });
+        });
+      }, 60000);
     }).catch(function (e) {
       console.error(e);
       var msg = DataStore.mode === 'firebase'

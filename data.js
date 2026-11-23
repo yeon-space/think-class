@@ -74,6 +74,11 @@
   function writerLimit() { var e = new Error('다른 친구 두 명에게 댓글을 하나씩 남겨 주세요'); e.code = 'writer-limit'; return e; }
   function duplicateTarget() { var e = new Error('이미 댓글을 남긴 친구예요'); e.code = 'duplicate-target'; return e; }
   function duplicateGroup() { var e = new Error('우리 모둠이 이미 댓글을 남겼어요'); e.code = 'duplicate-group'; return e; }
+  function commentBusy() { var e = new Error('다른 모둠이 댓글을 작성 중이에요'); e.code = 'comment-busy'; return e; }
+  function activeLeases(groupwork, comments) {
+    var now = Date.now(), done = comments.map(function (c) { return c.authorGroup; });
+    return (groupwork.nCommentLeases || []).filter(function (x) { return x && x.until > now && done.indexOf(x.group) < 0; });
+  }
   function migrateCode(lesson) {
     if (lesson.teacherCodeRevision !== '2026-10-30') { lesson.teacherCode = '12341234'; lesson.teacherCodeRevision = '2026-10-30'; }
     return lesson;
@@ -136,6 +141,23 @@
           .filter(function (d) { return match(d, where); }));
       },
       findDocs: function (col, where) { return this.listDocs(col, where); },
+      reserveGroupComment: function (target, group, token) {
+        var c=classId;
+        function save() {
+          var db=read(c), w=(db.groupwork || {})[target]; if (!w) throw new Error('모둠 방안이 없어요');
+          var comments=Object.keys(db.comments || {}).map(function (id) { return db.comments[id]; }).filter(function (x) { return x.phase==='N' && x.targetType==='solution' && x.targetId===target; });
+          if (comments.some(function (x) { return x.authorGroup===group; })) throw duplicateGroup();
+          var leases=activeLeases(w,comments), mine=leases.find(function (x) { return x.token===token; });
+          if (!mine && (leases.some(function (x) { return x.group===group; }) || comments.length+leases.length>=2)) throw commentBusy();
+          leases=leases.filter(function (x) { return x.token!==token; }); leases.push({group:group,token:token,until:Date.now()+180000});
+          w.nCommentLeases=leases; localStorage.setItem(key(c),JSON.stringify(db)); changes.emit();
+        }
+        return navigator.locks ? navigator.locks.request('think-data-'+c,save) : Promise.reject(new Error('댓글 동시 작성 보호를 지원하지 않는 브라우저예요.'));
+      },
+      releaseGroupComment: function (target, token) {
+        var c=classId; function save() { var db=read(c),w=(db.groupwork||{})[target]; if (!w) return; w.nCommentLeases=(w.nCommentLeases||[]).filter(function (x) { return x.token!==token; }); localStorage.setItem(key(c),JSON.stringify(db)); changes.emit(); }
+        return navigator.locks ? navigator.locks.request('think-data-'+c,save) : Promise.resolve();
+      },
       findOrCreateStudent: function (group, name) {
         var c = classId;
         function join() {
@@ -428,6 +450,31 @@
         }).then(function (snap) {
           return snap.docs.map(function (d) { return Object.assign(d.data(), { id: d.id }); });
         });
+      },
+      reserveGroupComment: function (target, authorGroup, token) {
+        var c=classId;
+        return ready.then(function () {
+          var group=colRef('groupwork',c).doc(target), comments=colRef('comments',c);
+          return comments.where('targetId','==',target).get().then(function (existing) {
+            var legacy=existing.docs.filter(function (s) {var x=s.data();return x.phase==='N'&&x.targetType==='solution';}).map(function (s) {return s.id;});
+            return db.runTransaction(function (tx) {return tx.get(group).then(function (snap) {
+              if (!snap.exists) throw new Error('모둠 방안이 없어요');
+              var w=snap.data(), ids=Array.isArray(w.nCommentIds)?w.nCommentIds:legacy;
+              return Promise.all(ids.map(function (id) {return tx.get(comments.doc(id));})).then(function (snaps) {
+                var posted=snaps.filter(function (s) {if (!s.exists) return false; var x=s.data();return x.phase==='N'&&x.targetType==='solution'&&x.targetId===target;}).map(function (s) {return s.data();});
+                if (posted.some(function (x) {return x.authorGroup===authorGroup;})) throw duplicateGroup();
+                var leases=activeLeases(w,posted),mine=leases.find(function (x) {return x.token===token;});
+                if (!mine && (leases.some(function (x) {return x.group===authorGroup;}) || posted.length+leases.length>=2)) throw commentBusy();
+                leases=leases.filter(function (x) {return x.token!==token;}); leases.push({group:authorGroup,token:token,until:Date.now()+180000});
+                tx.set(group,{nCommentLeases:leases},{merge:true});
+              });
+            });});
+          });
+        });
+      },
+      releaseGroupComment: function (target, token) {
+        var c=classId;
+        return ready.then(function () {var group=colRef('groupwork',c).doc(target);return db.runTransaction(function(tx){return tx.get(group).then(function(s){if (!s.exists) return;tx.set(group,{nCommentLeases:(s.data().nCommentLeases||[]).filter(function(x){return x.token!==token;})},{merge:true});});});});
       },
       findOrCreateStudent: function (group, name) {
         var c = classId, self = this;
