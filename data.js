@@ -46,6 +46,7 @@
   function match(doc, where) {
     return !where || Object.keys(where).every(function (k) { return doc[k] === where[k]; });
   }
+  function studentIdentity(group, name) { return 'student_' + encodeURIComponent(JSON.stringify([group, name])); }
   function sampleData() { return window.SAMPLE_DATA ? window.SAMPLE_DATA() : { config: {} }; }
   function lessonOnly() {   // 실제 반: 수업 설정만, T단계만 열린 상태로 시작
     var config = sampleData().config;
@@ -70,6 +71,8 @@
     if (expected && Object.keys(expected).some(function (k) { return JSON.stringify(current[k] == null ? null : current[k]) !== JSON.stringify(expected[k]); })) throw conflict(current);
   }
   function commentLimit() { var e = new Error('이미 이 글에 댓글이 2개 달렸어요'); e.code = 'comment-limit'; return e; }
+  function writerLimit() { var e = new Error('다른 친구 두 명에게 댓글을 하나씩 남겨 주세요'); e.code = 'writer-limit'; return e; }
+  function duplicateTarget() { var e = new Error('이미 댓글을 남긴 친구예요'); e.code = 'duplicate-target'; return e; }
   function migrateCode(lesson) {
     if (lesson.teacherCodeRevision !== '2026-10-30') { lesson.teacherCode = '12341234'; lesson.teacherCodeRevision = '2026-10-30'; }
     return lesson;
@@ -132,6 +135,18 @@
           .filter(function (d) { return match(d, where); }));
       },
       findDocs: function (col, where) { return this.listDocs(col, where); },
+      findOrCreateStudent: function (group, name) {
+        var c = classId;
+        function join() {
+          var db = read(c), all = db.students || {}, found = Object.keys(all).filter(function (id) { return all[id].group === group && all[id].name === name; })[0];
+          if (found) return Object.assign(clone(all[found]), { id: found });
+          var id = studentIdentity(group, name), student = { group: group, name: name, createdAt: Date.now() };
+          db.students = all; all[id] = student; localStorage.setItem(key(c), JSON.stringify(db)); changes.emit();
+          return Object.assign(clone(student), { id: id });
+        }
+        if (navigator.locks) return navigator.locks.request('think-data-' + c, join);
+        return Promise.resolve().then(join);
+      },
 
       setDoc: function (col, id, data, opt) {
         var c = classId;
@@ -150,6 +165,11 @@
         function save() {
           var db = read(c), all = db.comments || {};
           if (data.phase === 'H' && Object.keys(all).filter(function (id) { var x = all[id]; return x.phase === 'H' && x.targetType === data.targetType && x.targetId === data.targetId; }).length >= 2) throw commentLimit();
+          if (data.phase === 'H' && data.targetType === 'tcard' && data.authorId && data.authorGroup) {
+            var written = Object.keys(all).map(function (id) { return all[id]; }).filter(function (x) { return x.phase === 'H' && x.targetType === 'tcard' && x.authorId === data.authorId; });
+            if (data.authorId === data.targetId || written.some(function (x) { return x.targetId === data.targetId; })) throw duplicateTarget();
+            if (written.length >= 2) throw writerLimit();
+          }
           var id = 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
           db.comments = all; all[id] = stripId(data);
           localStorage.setItem(key(c), JSON.stringify(db)); changes.emit(); return id;
@@ -254,7 +274,7 @@
       return p.then(function (r) {
         delete failed[key]; pending--; syncEv.emit(pending, Object.keys(failed).length > 0); return r;
       }, function (e) {
-        if (e.code !== 'conflict' && e.code !== 'comment-limit') { failed[key] = true; report(e); }
+        if (e.code !== 'conflict' && e.code !== 'comment-limit' && e.code !== 'writer-limit' && e.code !== 'duplicate-target') { failed[key] = true; report(e); }
         pending--; syncEv.emit(pending, Object.keys(failed).length > 0); throw e;
       });
     }
@@ -407,6 +427,22 @@
           return snap.docs.map(function (d) { return Object.assign(d.data(), { id: d.id }); });
         });
       },
+      findOrCreateStudent: function (group, name) {
+        var c = classId, self = this;
+        return self.findDocs('students', { group: group, name: name }).then(function (list) {
+          if (list.length) return list[0];
+          return ready.then(function () {
+            var ref = colRef('students', c).doc(studentIdentity(group, name));
+            return track(db.runTransaction(function (tx) {
+              return tx.get(ref).then(function (snap) {
+                if (snap.exists) return Object.assign(snap.data(), { id: snap.id });
+                var student = { group: group, name: name, createdAt: Date.now() };
+                tx.set(ref, student); return Object.assign({}, student, { id: ref.id });
+              });
+            }), 'student/' + c + '/' + ref.id);
+          });
+        });
+      },
 
       setDoc: function (col, id, data, opt) {
         return ready.then(function () {
@@ -426,17 +462,29 @@
         var c = classId;
         return ready.then(function () {
           var comments = colRef('comments', c), card = colRef('tcards', c).doc(data.targetId), ref = comments.doc();
-          return track(comments.where('targetId', '==', data.targetId).get().then(function (existing) {
-            var legacy = existing.docs.filter(function (s) { var x=s.data(); return x.phase === 'H' && x.targetType === 'tcard'; }).map(function (s) { return s.id; });
+          var enforceWriter = !!(data.authorId && data.authorGroup), author = enforceWriter ? colRef('students', c).doc(data.authorId) : null;
+          if (enforceWriter && data.authorId === data.targetId) return Promise.reject(duplicateTarget());
+          return track(Promise.all([comments.where('targetId', '==', data.targetId).get(), enforceWriter ? comments.where('authorId', '==', data.authorId).get() : Promise.resolve({docs:[]})]).then(function (existing) {
+            var legacy = existing[0].docs.filter(function (s) { var x=s.data(); return x.phase === 'H' && x.targetType === 'tcard'; }).map(function (s) { return s.id; });
+            var legacyWritten = existing[1].docs.filter(function (s) { var x=s.data(); return x.phase === 'H' && x.targetType === 'tcard'; }).map(function (s) { return s.id; });
             return db.runTransaction(function (tx) {
-              return tx.get(card).then(function (s) {
+              return Promise.all([tx.get(card), author ? tx.get(author) : Promise.resolve(null)]).then(function (states) {
+                var s = states[0], authorState = states[1];
                 if (!s.exists) throw new Error('댓글을 달 글이 없어졌어요.');
+                if (author && !authorState.exists) throw new Error('학생 정보를 찾지 못했어요. 다시 입장해 주세요.');
                 var ids = s.data().hCommentIds;
                 if (!Array.isArray(ids)) ids = legacy;
-                return Promise.all(ids.map(function (id) { return tx.get(comments.doc(id)); })).then(function (snaps) {
-                  var live = ids.filter(function (_, i) { return snaps[i].exists; });
+                var writtenIds = author && Array.isArray(authorState.data().hWrittenCommentIds) ? authorState.data().hWrittenCommentIds : legacyWritten;
+                var allIds = ids.concat(writtenIds).filter(function (id, i, list) { return list.indexOf(id) === i; });
+                return Promise.all(allIds.map(function (id) { return tx.get(comments.doc(id)); })).then(function (snaps) {
+                  var liveById = {}; snaps.forEach(function (snap) { if (snap.exists) liveById[snap.id] = snap.data(); });
+                  var live = ids.filter(function (id) { var x=liveById[id]; return x && x.phase === 'H' && x.targetType === 'tcard' && x.targetId === data.targetId; });
+                  var written = writtenIds.filter(function (id) { var x=liveById[id]; return x && x.phase === 'H' && x.targetType === 'tcard' && x.authorId === data.authorId; });
                   if (live.length >= 2) throw commentLimit();
+                  if (author && written.some(function (id) { return liveById[id].targetId === data.targetId; })) throw duplicateTarget();
+                  if (author && written.length >= 2) throw writerLimit();
                   tx.set(card, {hCommentIds:live.concat([ref.id])}, {merge:true});
+                  if (author) tx.set(author, {hWrittenCommentIds:written.concat([ref.id])}, {merge:true});
                   tx.set(ref, stripId(data));
                   return ref.id;
                 });
@@ -461,10 +509,12 @@
               if (!snap.exists) return;
               var c = snap.data();
               if (c.phase !== 'H' || c.targetType !== 'tcard') { tx.delete(ref); return; }
-              var card = colRef('tcards').doc(c.targetId);
-              return tx.get(card).then(function (s) {
-                var ids = s.exists && s.data().hCommentIds;
+              var card = colRef('tcards').doc(c.targetId), author = c.authorId && c.authorGroup ? colRef('students').doc(c.authorId) : null;
+              return Promise.all([tx.get(card), author ? tx.get(author) : Promise.resolve(null)]).then(function (states) {
+                var s = states[0], authorState = states[1], ids = s.exists && s.data().hCommentIds;
                 if (ids) tx.set(card, {hCommentIds:ids.filter(function (x) { return x !== id; })}, {merge:true});
+                var written = authorState && authorState.exists && authorState.data().hWrittenCommentIds;
+                if (written) tx.set(author, {hWrittenCommentIds:written.filter(function (x) { return x !== id; })}, {merge:true});
                 tx.delete(ref);
               });
             });

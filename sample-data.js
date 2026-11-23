@@ -23,7 +23,7 @@ window.SAMPLE_DATA = function () {
     '유희성', '이윤아', '이지호', '장은솔',
     '정시우', '정연우', '차승훈', '홍재민'
   ];
-  var TOOLS = ['ChatGPT', 'Gemini', '뤼튼', 'Claude', 'ChatGPT', 'Gemini'];
+  var TOOLS = ['예시용 가상 AI', '예시용 가상 AI', '예시용 가상 AI', '예시용 가상 AI'];
 
   /* =================================================================
    * 모둠별 탐구 이야기
@@ -238,6 +238,19 @@ window.SAMPLE_DATA = function () {
   ];
 
   /* 성찰 문장 (처음 입장에 따라) */
+  if (window.THINK_EXAMPLE_GROUPS && window.THINK_EXAMPLE_GROUPS.length === 8) {
+    STORY = window.THINK_EXAMPLE_GROUPS.map(function (e) {
+      return {
+        key:e.topic, source:e.source, url:e.url,
+        t:e.opinions.map(function (o) { return [o[0], '유전자 조작기술은 인간에게 ' + (o[0] === 'bless' ? '축복' : '재앙') + '이다.', o[1], o[2]]; }),
+        qa:e.qa.map(function (q) { return [q[0], '학습을 위한 가상의 AI 답변: ' + q[1], q[1], e.source + ' · ' + e.url]; }),
+        v:e.qa.map(function (q) { return ['수용', '안내된 자료를 직접 확인한 뒤 관련 내용을 비교해 보았다.']; }),
+        extra:['AI가 "유전자 조작은 언제나 위험이 없다"라고 말했다.', '제외', '기술과 적용 대상에 따라 위험을 따로 살펴야 한다.'],
+        sol:e.plan, idea:e.idea, final:e.plan
+      };
+    });
+  }
+
   var REFLECT = {
     bless: {
       keep: ['기술이 사람을 도울 수 있다는 생각은 끝까지 그대로다.', '좋은 점이 더 크다는 생각은 바뀌지 않았다.'],
@@ -302,14 +315,24 @@ window.SAMPLE_DATA = function () {
   };
 
   /* 진행 상황을 조금씩 다르게 (교사 현황표 확인용) */
-  var T_WIP = { s32: 1 };                 // T카드 작성 중
+  var T_WIP = {};                          // 예시 학생 모두 T 작성
   var K_NOT = { s08: 1, s23: 1, s32: 1 };  // K 아직 안 씀
   var K_HALF = { s16: 1, s27: 1 };         // K 결과물만 쓰고 성찰은 아직
-  var I_NOT = { s32: 1 };                  // I 답변 아직 기록 안 함 (→ N에 "I 먼저" 안내 줄)
-  var N_NOT = { s28: 1, s32: 1 };          // N 판단 아직 안 함
+  var I_NOT = {};                          // 질문별 작성 예시
+  var N_NOT = {};
 
   // AI가 섞어 넣은 틀린 말을 어느 질문 답변에 넣을지 (모둠별 질문 번호 0~3)
-  var FALSE_IN = [0, 0, 2, 2, 2, 1, 0, 0];
+  var FALSE_IN = [-1, -1, -1, -1, -1, -1, -1, -1];
+  var EXAMPLE_EXCLUSIONS = [
+    ['연구를 허용하면 출산도 곧바로 허용된다는 단정은 빼기로 했다.', '부모의 결정만으로 아이의 권리 문제가 모두 해결된다는 단정은 제외한다.', '원하는 위치만 무조건 바뀐다는 설명은 안전성 확인 없이 쓰지 않는다.', '사회 구성원 모두가 같은 의견을 갖고 있다는 가정은 제외한다.'],
+    ['치료 목적과 외모 선택이 언제나 똑같다는 설명은 제외한다.', '기술이 비싸다는 이유만으로 반드시 특정 결과가 생긴다고 단정하지 않는다.', '몸의 모든 편집이 후손에게 전달된다는 표현은 빼기로 했다.', '부모의 동의만 있으면 다른 윤리 문제는 없다는 단정은 제외한다.'],
+    ['베타카로틴이 곧바로 모든 영양소가 된다는 설명은 쓰지 않는다.', '쌀 하나만으로 모든 영양 부족이 해결된다는 주장은 제외한다.', '유전자 변형 식품이 전부 동일한 방법으로 만들어진다는 가정은 빼기로 했다.', '식품을 개발하기만 하면 필요한 곳에 자동으로 전달된다는 단정은 제외한다.'],
+    ['모든 유전자 변형 식품의 안전성을 한 번에 판단할 수 있다는 주장은 빼기로 했다.', '심사 항목 하나만 확인하면 모든 안전성 평가가 끝난다는 설명은 제외한다.', '모든 작물이 같은 생태계 영향을 준다는 표현은 사용하지 않는다.', '표시 하나만으로 식품의 모든 정보를 알 수 있다는 단정은 제외한다.'],
+    ['유전자 편집만으로 모든 질병을 고칠 수 있다는 설명은 제외한다.', '목표 밖 편집이 일어나면 반드시 특정 질병이 생긴다는 단정은 빼기로 했다.', '환자가 위험을 이해하지 않아도 된다는 주장은 사용하지 않는다.', '치료 직후의 결과만으로 평생의 안전성을 확정하는 표현은 제외한다.'],
+    ['연구가 진행 중이라는 사실을 이미 치료법이 완성됐다는 뜻으로 쓰지 않는다.', '복제와 유전자 편집이 완전히 같은 기술이라는 설명은 제외한다.', '영화의 장면을 실제 연구에서 일어난 사실로 적지 않기로 했다.', '연구 목적이 좋으면 설명과 동의가 필요 없다는 주장은 제외한다.'],
+    ['조류인플루엔자와 관련 없는 모든 감염병을 막는다는 설명은 제외한다.', '실험에서 효과가 있으니 어떤 조건에서도 감염되지 않는다는 단정은 빼기로 했다.', '유전자 편집만으로 다른 방역이 불필요하다는 주장은 제외한다.', '감염 여부 하나만으로 동물복지를 전부 판단하는 표현은 쓰지 않는다.'],
+    ['모든 종류의 모기를 없애는 연구라는 설명은 자료 확인 없이 쓰지 않는다.', '모기 수의 변화가 주변 생물에 무조건 아무 영향이 없다는 단정은 제외한다.', '연구자만 결정하면 주민 설명은 필요 없다는 주장은 제외한다.', '모기 한 가지 방법만으로 모든 감염병을 예방한다는 설명은 빼기로 했다.']
+  ];
   // "…다" → "…다고", "…이다" → "…이라고", "…것" → "…것이라고"
   function quoteForm(claim) {
     if (/이다$/.test(claim)) return claim.replace(/이다$/, '이라고');
@@ -337,7 +360,8 @@ window.SAMPLE_DATA = function () {
       var card = { group: G, stance: c[0], claim: c[1], reason: c[2], solution: c[3],
                    submitted: true, submittedAt: t(100 - g * 2 - k), updatedAt: t(100 - g * 2 - k) };
       if (T_WIP[id]) { card.reason = ''; card.solution = ''; card.submitted = false; delete card.submittedAt; }
-      delete card.stance;
+      if (c[0] === 'bless' || c[0] === 'curse') card.stance = c[0] === 'bless' ? '축복' : '재앙';
+      else delete card.stance;
       data.tcards[id] = card;
     });
 
@@ -351,20 +375,20 @@ window.SAMPLE_DATA = function () {
         phase: 'H', targetType: 'tcard', targetId: target, targetGroup: G,
         authorId: author, authorName: sname(author), authorGroup: G, createdAt: t(78 - g - k),
         fields: [
-          { label: '나와 비슷한 점', value: same ? '입장이 나와 같아. 특히 "' + you[3].replace(/\.$/, '') + '"라는 보완방안이 공감돼.' : st.key + ' 문제를 중요하게 본 점은 나와 같아.' },
-          { label: '다른 점', value: same ? '나는 근거를 다른 쪽에서 찾았어. 나는 "' + me[2].replace(/\.$/, '') + '"라고 생각했어.' : '나는 반대로 생각했어. "' + me[1].replace(/\.$/, '') + '"는 게 내 생각이야.' },
-          { label: '잘한 점', value: ['근거가 구체적이라서 이해하기 쉬워.', '보완방안까지 현실적으로 썼어.', '다른 사람 입장까지 생각한 게 좋았어.', '짧지만 핵심이 분명해.'][(g + k) % 4] }
+          { label: '나와 비슷한 점', value: same ? '우리 둘 다 같은 입장이야. ' + st.key + '에서 어떤 점을 중요하게 보는지 비교해 보고 싶어.' : '입장은 다르지만 우리 둘 다 ' + st.key + '에서 생길 문제를 해결하려고 생각했어.' },
+          { label: '다른 점', value: '나는 ' + me[2] + ' 반면 너는 ' + you[2] },
+          { label: '잘한 점', value: '특히 ' + you[3] + '라고 한 보완방안이 구체적이라 참고할 만해.' }
         ]
       });
-      if ((g + k) % 3 === 0 && submitted.length > 2) {
+      if (submitted.length > 2) {
         var a2 = submitted[(k + 2) % submitted.length];
         addComment({
           phase: 'H', targetType: 'tcard', targetId: target, targetGroup: G,
           authorId: a2, authorName: sname(a2), authorGroup: G, createdAt: t(70 - g - k),
           fields: [
-            { label: '나와 비슷한 점', value: '해결 방안에 규칙이 필요하다고 한 점이 나와 같아.' },
-            { label: '다른 점', value: '나는 ' + st.key + '에 대해 AI에게 더 물어보고 싶은 게 있어.' },
-            { label: '잘한 점', value: '친구들이 질문을 만들 때 참고할 만한 카드야.' }
+            { label: '나와 비슷한 점', value: st.key + '에 관해 기술의 영향을 먼저 생각한 점이 나와 비슷해.' },
+            { label: '다른 점', value: '나는 ' + st.t[mem.indexOf(a2)][2] + ' 너는 ' + you[2] },
+            { label: '잘한 점', value: you[3] + '라는 제안 덕분에 다른 관점도 살펴볼 수 있었어.' }
           ]
         });
       }
@@ -385,8 +409,8 @@ window.SAMPLE_DATA = function () {
         group: G, answer: answer, tool: TOOLS[(g + k) % TOOLS.length], hasSource: !!q[3], sourceNote: q[3],
         summary: summary,
         accept: st.qa[k][2],
-        exclude: k === fq ? '확인되지 않은 과장된 부분을 그대로 받아들이지 않아요. ' + st.extra[2] : '자료와 맞지 않거나 근거가 부족한 단정적인 표현은 제외해요.',
-        uncertain: '사용한 자료의 작성 기관과 발표 시기를 확인하고, 장기적인 결과는 추가 자료를 찾아봐요.',
+        exclude: '답변에서 실제로 제외할 문장은 확인하지 못했다. 다만 ' + EXAMPLE_EXCLUSIONS[g][k],
+        uncertain: '“' + q[0] + '”에 관한 자료를 더 찾아 작성 기관과 발표 시기, 적용 조건을 확인하겠다.',
         updatedBy: sname(who), updatedAt: t(48 - g - k)
       };
       a['c_' + who] = t(48 - g - k);
@@ -396,6 +420,7 @@ window.SAMPLE_DATA = function () {
 
     /* I 중간 해결안 */
     data.groupwork[G] = {
+      topic: st.key,
       solution: st.sol, solutionBy: sname(mem[2]), solutionAt: t(36 - g),
       uniqueIdea: st.idea, uniqueIdeaBy: sname(mem[0]), uniqueIdeaAt: t(20 - g)
     };
@@ -403,7 +428,7 @@ window.SAMPLE_DATA = function () {
       var n = k + 1, work = data.groupwork[G];
       work['mid' + n + '_plan'] = k === 0 ? st.sol : st.t[k][3];
       work['mid' + n + '_basis'] = st.t[k][2] + '\n근거·사례: ' + st.qa[k][2];
-      work['rev' + n + '_plan'] = work['mid' + n + '_plan'];
+      work['rev' + n + '_plan'] = k === 0 ? st.sol + ' ' + st.idea : work['mid' + n + '_plan'];
       work['rev' + n + '_basis'] = work['mid' + n + '_basis'];
     });
     data.groupwork[G].revision = [1,2,3].map(function (n) {
@@ -439,19 +464,19 @@ window.SAMPLE_DATA = function () {
     mem.forEach(function (id, k) {
       var stance = st.t[k][0], R = REFLECT[stance], v = (g + k) % 2;
       var f = {
-        text: st.final + '\n\n' + ['나는 특히 우리 모둠 아이디어인 "' + st.idea.split('"')[1] + '"가 꼭 필요하다고 생각한다.',
-                                   '이를 위해 과학자, 정부, 시민이 함께 기준을 정하고 결과를 공개해야 한다.'][v],
+        text: st.t[k][1] + '\n이유: ' + st.t[k][2] + '\n근거·사례: ' + st.qa[k][2] + '\n보완방안: ' + st.t[k][3],
         stance: stance === 'curse' ? '재앙' : stance === 'bless' ? '축복' : '',
-        reason1: st.t[k][2], evidence1: st.qa[0][2],
-        reason2: '활용할 때 생길 수 있는 문제를 살펴보아야 하기 때문이다.', evidence2: st.v[0][1],
-        reason3: '기술을 더 안전하고 책임 있게 활용해야 하기 때문이다.', evidence3: st.idea,
+        reason1: st.t[k][2], evidence1: st.qa[k][2],
+        reason2: st.qa[(k + 1) % 4][2] + ' 따라서 기술의 효과와 한계를 함께 살펴야 한다고 생각한다.',
+        evidence2: st.qa[(k + 2) % 4][2] + ' (참고: ' + (st.source || st.key) + ')',
+        reason3: '모둠에서 논의한 “' + st.idea + '”라는 방안이 필요하다고 생각한다.', evidence3: st.qa[(k + 3) % 4][2],
         updatedAt: t(12 - g - k * 0.2)
       };
-      if (!K_HALF[id]) {
-        f.keep = R.keep[v]; f.changed = R.changed[v]; f.influence = R.influence[v];
-        f.groupTalk = R.groupTalk[(v + k) % 2].replace('{key}', st.key);
-        f.aiView = R.aiView[(v + g) % 2];
-      }
+      f.keep = '처음에 “' + st.t[k][2] + '”라고 생각했던 점은 활동 후에도 중요하다고 느꼈다.';
+      f.changed = '“' + st.qa[k][0] + '”을 알아보며 ' + st.qa[k][2] + ' 이 점을 처음보다 더 신중하게 생각하게 됐다.';
+      f.groupTalk = '친구들과 ' + st.key + '을 토의하면서 “' + st.idea + '”라는 방안을 함께 살펴보았다.';
+      f.aiView = 'AI가 “' + st.qa[k][0] + '”에 답하더라도 그대로 옮기지 않고 자료와 비교하면 답의 한계와 확인할 점을 찾을 수 있었다.';
+      f.aiThinking = 'AI에 묻기 전에 ' + st.key + '에 대한 내 입장과 이유를 먼저 쓰고, 궁금한 질문을 스스로 만든 뒤 자료를 확인하겠다.';
       data.finals[id] = f;
     });
   });
@@ -475,9 +500,9 @@ window.SAMPLE_DATA = function () {
         phase: 'N', targetType: 'solution', targetId: GROUPS[tg], targetGroup: GROUPS[tg],
         authorId: author, authorName: sname(author), authorGroup: GROUPS[g], createdAt: t(33 - g - j),
         fields: [
-          { label: '👍 좋은 점', value: '문제의 이점과 우려를 함께 살펴보고 실천할 방향을 제시한 점이 좋아.' },
-          { label: '💭 아쉬운 점', value: '방안을 시행할 때 누가 참여하고 무엇을 먼저 할지 좀 더 구체적이면 좋겠어.' },
-          { label: '🔍 사실 확인이 필요한 부분', value: '이 방안을 시행했을 때 예상한 효과가 나타나는지 믿을 만한 자료로 확인해 보자.' }
+          { label: '👍 좋은 점', value: '너희 모둠이 “' + ts.sol + '”라고 제안한 점이 구체적이라 이해하기 쉬워.' },
+          { label: '💭 아쉬운 점', value: (j ? '우리 모둠은 “' + st.idea + '”라고 제안했어. 너희 방안은 누가 언제 실행할지 더 알려 주면 좋겠어.' : '우리 모둠은 “' + st.sol + '”라고 생각했어. 너희 방안의 한계나 보완할 점도 함께 적어 주면 좋겠어.') },
+          { label: '🔍 사실 확인이 필요한 부분', value: '“' + ts.qa[(g + j) % 4][0] + '”에 대해 ' + (ts.source || '공신력 있는 자료') + '를 다시 확인해 보면 좋겠어.' }
         ]
       });
     });

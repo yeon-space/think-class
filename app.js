@@ -601,9 +601,10 @@
     }
     return '<div class="phase-head ph-' + k + '"><div class="big">' + k + '</div><div>' +
       '<h2>' + p.icon + ' ' + p.title + lockNote + '</h2>' + enName(p) +
+      ((S.user && S.d && gw(myGroup()).topic) ? '<p class="q">모둠 주제: ' + esc(gw(myGroup()).topic) + '</p>' : '') +
       ((k !== 'I' && k !== 'N' && L().prompts[k]) ? '<p class="q">' + nl(L().prompts[k]) + '</p>' : '') +
       '</div>' + pick + '</div>' +
-      ((k === 'I' || k === 'N') ? '<div class="notice tablet-guide ph-' + k + '"><b>📱 모둠에서 태블릿 한 대만 사용하고 나머지 태블릿은 덮어 두세요.</b>' + (k === 'I' ? '<br><small>질문마다 작성한 학생의 이름으로 입장해 기록해요.</small>' : '') + '</div>' : '') +
+      (k === 'N' ? '<div class="notice tablet-guide ph-N"><b>📱 모둠에서 태블릿 한 대만 사용하고 나머지 태블릿은 덮어 두세요.</b></div>' : '') +
       '<div class="phase-guide ph-' + k + '"><b>이 단계에서 할 일</b><span>' + guides[k] + '</span>' +
       (pending ? '<small>' + pending + '</small>' : '') + '</div>';
   }
@@ -734,6 +735,9 @@
 
     out += section('H', '💭 ' + esc(g) + ' 친구들의 초기 생각');
     var mem = membersOf(g);
+    if (!isTeacher() && S.classId === DataStore.TEST_CLASS && mem.length > 1 && mem.filter(function (s) { return s.id !== me().id; }).every(function (s) { return commentsOn('H', 'tcard', s.id).length >= MAX_H_COMMENTS; })) {
+      out += '<div class="notice info">🧪 테스트반은 댓글 예시가 채워져 있어요. 댓글 작성을 연습하려면 내가 쓴 예시 댓글을 삭제한 뒤 다시 작성해 보세요.</div>';
+    }
     if (!mem.length) out += '<div class="empty">이 모둠에는 아직 입장한 학생이 없어요.</div>';
     out += '<div class="grid2">' + mem.map(function (s) {
       var c = S.d.tcardsById[s.id];
@@ -761,8 +765,8 @@
           '<button class="btn small ghost" data-act="cancelQ">취소</button></li>';
       }
       return '<li' + (!isTeacher() && isMyQ(q) ? ' class="mine"' : '') + '><span class="num"></span><span class="text">' + esc(q.text) + (q.createdBy ? '<small>' + esc(q.createdBy) + (!isTeacher() && isMyQ(q) ? ' · 내 질문' : '') + '</small>' : '') + '</span>' +
-        '<button class="btn small" data-act="editQ" data-id="' + q.id + '">✏️ 수정</button>' +
-        '<button class="btn small ghost danger" data-act="delQ" data-id="' + q.id + '">🗑 삭제</button></li>';
+        ((isTeacher() || isMyQ(q)) ? '<button class="btn small" data-act="editQ" data-id="' + q.id + '">✏️ 수정</button>' +
+        '<button class="btn small ghost danger" data-act="delQ" data-id="' + q.id + '">🗑 삭제</button>' : '') + '</li>';
     }).join('') + '</ol>' : '<div class="empty" style="margin-bottom:12px">아직 질문이 없어요. 모둠원과 이야기하며 AI에게 물어볼 질문을 만들어 보세요.</div>';
     out += '<div class="qadd">' + inp('qnew', '', '예) 유전자 조작으로 치료된 병이 실제로 있을까?').replace('<input', '<input data-enter="addQ"') +
       '<button class="btn primary ph-H" data-act="addQ">＋ 질문 추가</button></div>';
@@ -889,6 +893,7 @@
 
     var w = gw(g);
     out += section('I', '🧩 ' + esc(g) + ' 중간 해결안');
+    out += '<div class="notice tablet-guide ph-I"><b>📱 이제 모둠에서 태블릿 한 대만 사용하고 나머지 태블릿은 덮어 두세요.</b></div>';
     out += '<div class="card result ph-I">' +
       '<div class="result-head"><span class="ribbon">모둠 결과</span><span>위의 AI 답변과 모둠 토의를 모아, 우리 모둠의 해결안을 정리해요</span></div>' +
       conflictBox('sol.' + g) +
@@ -1423,12 +1428,8 @@
       if (!name) return toast('이름을 입력해 주세요');
       if (el) el.disabled = true;
       // 같은 반·같은 모둠에 같은 이름이 있으면 그 학생으로 이어서 입장
-      return DataStore.findDocs('students', { name: name, group: group }).then(function (list) {
-        var found = list[0];
-        if (found) return setUser({ role: 'student', id: found.id, name: found.name, group: found.group, kickSeen: found.kickedAt || 0 });
-        return DataStore.addDoc('students', { name: name, group: group, createdAt: Date.now() }).then(function (id) {
-          return setUser({ role: 'student', id: id, name: name, group: group }).then(function () { toast(name + '님, 환영해요!'); });
-        });
+      return DataStore.findOrCreateStudent(group, name).then(function (found) {
+        return setUser({ role: 'student', id: found.id, name: found.name, group: found.group, kickSeen: found.kickedAt || 0 });
       }).catch(function (e) {
         if (el) el.disabled = false;
         throw e;
@@ -1463,6 +1464,11 @@
       if (phase === 'N' && (isTeacher() || tt !== 'solution' || assignedGroups(myGroup()).indexOf(tid) < 0)) return toast('지정된 모둠에만 댓글을 남길 수 있어요.');
       if (phase === 'N' && fields.some(function (f) { return f.value.replace(/\s/g, '').length < 10; })) return toast('각 칸을 공백 제외 10자 이상 작성해 주세요.');
       if (phase === 'H' && commentsOn(phase, tt, tid).length >= MAX_H_COMMENTS) return toast('이미 이 글에 댓글이 2개 달렸어요');
+      if (phase === 'H' && !isTeacher()) {
+        var target = S.d.studentsById[tid], written = S.d.comments.filter(function (c) { return c.phase === 'H' && c.targetType === 'tcard' && c.authorId === me().id; });
+        if (!target || target.group !== me().group || tid === me().id || written.some(function (c) { return c.targetId === tid; })) return toast('다른 친구에게 댓글을 하나씩 남겨 주세요.');
+        if (written.length >= 2) return toast('이미 서로 다른 친구 두 명에게 댓글을 남겼어요.');
+      }
       clearDrafts(prefix);
       return DataStore.addComment({
         phase: phase, targetType: tt, targetId: tid,
@@ -1486,10 +1492,11 @@
       return DataStore.addDoc('questions', { group: myGroup(), text: text, createdAt: Date.now(), createdBy: me().name, createdById: me().id })
         .then(function () { return done('질문을 추가했어요'); });
     },
-    editQ: function (el) { S.editingQ = el.dataset.id; render(); },
+    editQ: function (el) { var q = S.d.questionsById[el.dataset.id]; if (!q || (!isTeacher() && (!isMyQ(q) || q.group !== myGroup()))) return toast('내가 작성한 질문만 수정할 수 있어요.'); S.editingQ = el.dataset.id; render(); },
     cancelQ: function () { if (S.editingQ) clearDrafts('qe.' + S.editingQ); S.editingQ = null; render(); },
     saveQ: function (el) {
       var id = el.dataset.id, q = S.d.questionsById[id];
+      if (!q || (!isTeacher() && (!isMyQ(q) || q.group !== myGroup()))) return toast('내가 작성한 질문만 수정할 수 있어요.');
       var text = take('qe.' + id, q && q.text);
       if (!text) return toast('질문 내용을 입력해 주세요');
       return okToSave('qe.' + id).then(function (ok) {
@@ -1500,6 +1507,8 @@
     },
     delQ: function (el) {
       var id = el.dataset.id;
+      var q = S.d.questionsById[id];
+      if (!q || (!isTeacher() && (!isMyQ(q) || q.group !== myGroup()))) return toast('내가 작성한 질문만 삭제할 수 있어요.');
       var hasAns = !!S.d.aianswersById[id];
       return ask({ title: '질문 삭제', msg: hasAns ? '이 질문에는 AI 답변 기록도 있어요. 함께 삭제할까요?' : '이 질문을 삭제할까요?', ok: '삭제', danger: true }).then(function (yes) {
         if (!yes) return;
@@ -1767,7 +1776,7 @@
   function actionError(err) {
     if(err.code === 'conflict-handled') return;
     console.error(err);
-    toast(err.code === 'comment-limit' ? '이미 이 글에 댓글이 2개 달렸어요' : '저장하지 못했어요. 작성한 글은 남아 있어요. 연결을 확인하고 다시 저장해 주세요.');
+    toast(err.code === 'comment-limit' ? '이미 이 글에 댓글이 2개 달렸어요' : err.code === 'writer-limit' ? '이미 서로 다른 친구 두 명에게 댓글을 남겼어요.' : err.code === 'duplicate-target' ? '다른 친구에게 댓글을 하나씩 남겨 주세요.' : '저장하지 못했어요. 작성한 글은 남아 있어요. 연결을 확인하고 다시 저장해 주세요.');
   }
   function runAction(fn, el) {
     if(activeAction) { toast('처리 중이에요. 잠시 기다려 주세요.'); return; }
