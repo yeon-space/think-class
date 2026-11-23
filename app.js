@@ -654,9 +654,10 @@
   function commentsBlock(phase, tt, tid, canWrite, title) {
     var list = commentsOn(phase, tt, tid);
     var limited = phase === 'H' || phase === 'N', full = limited && list.length >= MAX_H_COMMENTS;
+    var groupAlreadyWrote = phase === 'N' && !isTeacher() && list.some(function (c) { return c.authorGroup === myGroup(); });
     return '<div class="comments">' +
       '<div class="ctitle">' + (title || '댓글') + ' ' + list.length + (limited ? '/' + MAX_H_COMMENTS : '') + '개</div>' +
-      (full && canWrite ? '<div class="clock">🔒 ' + (phase === 'N' ? '댓글 두 개가 모두 달렸어요. 다른 모둠에게 달아주세요.' : '댓글 2개가 모두 찼어요. 아직 댓글이 적은 다른 친구 카드에 남겨 주세요.') + '</div>'
+      (groupAlreadyWrote && canWrite ? '<div class="clock">✅ 우리 모둠이 이미 댓글을 남겼어요.</div>' : full && canWrite ? '<div class="clock">🔒 ' + (phase === 'N' ? '댓글 두 개가 모두 달렸어요. 다른 모둠에게 달아주세요.' : '댓글 2개가 모두 찼어요. 아직 댓글이 적은 다른 친구 카드에 남겨 주세요.') + '</div>'
             : (!full && canWrite ? commentForm(phase, tt, tid) : '')) +
       list.map(commentTable).join('') +
       '</div>';
@@ -1471,6 +1472,7 @@
       var fields = (phase === 'N' ? GROUP_COMMENT_FIELDS : L().commentFields[phase]).map(function (label, i) { return { label: label, value: take(prefix + '.' + i) }; });
       if (fields.some(function (f) { return !f.value; })) return toast('표의 모든 칸을 채워 주세요');
       if (phase === 'N' && (isTeacher() || tt !== 'solution' || assignedGroups(myGroup()).indexOf(tid) < 0)) return toast('지정된 모둠에만 댓글을 남길 수 있어요.');
+      if (phase === 'N' && commentsOn(phase, tt, tid).some(function (c) { return c.authorGroup === myGroup(); })) return toast('우리 모둠이 이미 댓글을 남겼어요.');
       if (phase === 'N' && fields.some(function (f) { return f.value.replace(/\s/g, '').length < 10; })) return toast('각 칸을 공백 제외 10자 이상 작성해 주세요.');
       if ((phase === 'H' || phase === 'N') && commentsOn(phase, tt, tid).length >= MAX_H_COMMENTS) return toast('이미 이 글에 댓글이 2개 달렸어요');
       if (phase === 'H' && !isTeacher()) {
@@ -1785,7 +1787,7 @@
   function actionError(err) {
     if(err.code === 'conflict-handled') return;
     console.error(err);
-    toast(err.code === 'comment-limit' ? '이미 이 글에 댓글이 2개 달렸어요' : err.code === 'writer-limit' ? '이미 서로 다른 친구 두 명에게 댓글을 남겼어요.' : err.code === 'duplicate-target' ? '다른 친구에게 댓글을 하나씩 남겨 주세요.' : '저장하지 못했어요. 작성한 글은 남아 있어요. 연결을 확인하고 다시 저장해 주세요.');
+    toast(err.code === 'comment-limit' ? '이미 이 글에 댓글이 2개 달렸어요' : err.code === 'duplicate-group' ? '우리 모둠이 이미 댓글을 남겼어요.' : err.code === 'writer-limit' ? '이미 서로 다른 친구 두 명에게 댓글을 남겼어요.' : err.code === 'duplicate-target' ? '다른 친구에게 댓글을 하나씩 남겨 주세요.' : '저장하지 못했어요. 작성한 글은 남아 있어요. 연결을 확인하고 다시 저장해 주세요.');
   }
   function runAction(fn, el) {
     if(activeAction) { toast('처리 중이에요. 잠시 기다려 주세요.'); return; }

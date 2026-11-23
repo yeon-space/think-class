@@ -73,6 +73,7 @@
   function commentLimit() { var e = new Error('이미 이 글에 댓글이 2개 달렸어요'); e.code = 'comment-limit'; return e; }
   function writerLimit() { var e = new Error('다른 친구 두 명에게 댓글을 하나씩 남겨 주세요'); e.code = 'writer-limit'; return e; }
   function duplicateTarget() { var e = new Error('이미 댓글을 남긴 친구예요'); e.code = 'duplicate-target'; return e; }
+  function duplicateGroup() { var e = new Error('우리 모둠이 이미 댓글을 남겼어요'); e.code = 'duplicate-group'; return e; }
   function migrateCode(lesson) {
     if (lesson.teacherCodeRevision !== '2026-10-30') { lesson.teacherCode = '12341234'; lesson.teacherCodeRevision = '2026-10-30'; }
     return lesson;
@@ -164,6 +165,7 @@
         var c = classId;
         function save() {
           var db = read(c), all = db.comments || {};
+          if (data.phase === 'N' && data.authorGroup && Object.keys(all).some(function (id) { var x=all[id]; return x.phase === 'N' && x.targetType === data.targetType && x.targetId === data.targetId && x.authorGroup === data.authorGroup; })) throw duplicateGroup();
           if ((data.phase === 'H' || data.phase === 'N') && Object.keys(all).filter(function (id) { var x = all[id]; return x.phase === data.phase && x.targetType === data.targetType && x.targetId === data.targetId; }).length >= 2) throw commentLimit();
           if (data.phase === 'H' && data.targetType === 'tcard' && data.authorId && data.authorGroup) {
             var written = Object.keys(all).map(function (id) { return all[id]; }).filter(function (x) { return x.phase === 'H' && x.targetType === 'tcard' && x.authorId === data.authorId; });
@@ -470,7 +472,9 @@
                   var ids = snap.data().nCommentIds;
                   if (!Array.isArray(ids)) ids = legacy;
                   return Promise.all(ids.map(function (id) { return tx.get(comments.doc(id)); })).then(function (snaps) {
-                    var live = snaps.filter(function (s) { if (!s.exists) return false; var x=s.data(); return x.phase === 'N' && x.targetType === 'solution' && x.targetId === data.targetId; }).map(function (s) { return s.id; });
+                    var liveSnaps = snaps.filter(function (s) { if (!s.exists) return false; var x=s.data(); return x.phase === 'N' && x.targetType === 'solution' && x.targetId === data.targetId; });
+                    if (data.authorGroup && liveSnaps.some(function (s) { return s.data().authorGroup === data.authorGroup; })) throw duplicateGroup();
+                    var live = liveSnaps.map(function (s) { return s.id; });
                     if (live.length >= 2) throw commentLimit();
                     tx.set(group, {nCommentIds:live.concat([ref.id])}, {merge:true});
                     tx.set(ref, stripId(data));
