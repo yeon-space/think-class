@@ -653,12 +653,12 @@
   }
   function commentsBlock(phase, tt, tid, canWrite, title) {
     var list = commentsOn(phase, tt, tid);
-    var limited = phase === 'H', full = limited && list.length >= MAX_H_COMMENTS;
+    var limited = phase === 'H' || phase === 'N', full = limited && list.length >= MAX_H_COMMENTS;
     return '<div class="comments">' +
       '<div class="ctitle">' + (title || '댓글') + ' ' + list.length + (limited ? '/' + MAX_H_COMMENTS : '') + '개</div>' +
+      (full && canWrite ? '<div class="clock">🔒 ' + (phase === 'N' ? '댓글 두 개가 모두 달렸어요. 다른 모둠에게 달아주세요.' : '댓글 2개가 모두 찼어요. 아직 댓글이 적은 다른 친구 카드에 남겨 주세요.') + '</div>'
+            : (!full && canWrite ? commentForm(phase, tt, tid) : '')) +
       list.map(commentTable).join('') +
-      (full ? '<div class="clock">🔒 댓글 ' + MAX_H_COMMENTS + '개가 모두 찼어요. 아직 댓글이 적은 다른 친구 카드에 남겨 주세요.</div>'
-            : (canWrite ? commentForm(phase, tt, tid) : '')) +
       '</div>';
   }
   function updateCommentButtons(root) {
@@ -1054,7 +1054,8 @@
       '<div class="btn-row"><button class="btn primary ph-K" data-act="uploadPoster">발표자료 올리기</button></div></div>';
     return html + '<div class="poster-grid">' + L().groups.map(function (g) {
       var poster = gw(g).posterImage;
-      return '<article class="poster-card"><h3>' + esc(g) + '</h3>' +
+      return '<article class="poster-card"><div class="poster-card-head"><h3>' + esc(g) + '</h3>' +
+        (poster && (isTeacher() || g === myGroup()) ? '<button class="btn small ghost danger" data-act="deletePoster" data-group="' + esc(g) + '">삭제</button>' : '') + '</div>' +
         (poster && /^data:image\/jpeg;base64,/.test(poster) ? '<img src="' + esc(poster) + '" alt="' + esc(g) + ' 발표자료">' : '<div class="poster-empty">아직 발표자료가 없어요</div>') + '</article>';
     }).join('') + '</div>';
   }
@@ -1399,6 +1400,14 @@
         return DataStore.setDoc('groupwork', g, { posterImage: image, posterUpdatedAt: Date.now() }, { merge: true });
       }).then(function () { return done('발표자료를 올렸어요!'); }).catch(function (e) { toast(e.message || '사진을 올리지 못했어요. 인터넷 연결을 확인해 주세요.'); });
     },
+    deletePoster: function (el) {
+      var g = el.dataset.group, poster = gw(g).posterImage;
+      if ((!isTeacher() && g !== myGroup()) || !poster) return;
+      return ask({title:'발표자료 삭제', msg:g + ' 발표자료 사진을 삭제할까요?', ok:'삭제', danger:true}).then(function (yes) {
+        if (!yes) return;
+        return DataStore.setDoc('groupwork', g, {posterImage:'', posterUpdatedAt:Date.now()}, {merge:true, expected:{posterImage:poster}}).then(function () { return done('발표자료를 삭제했어요.'); });
+      });
+    },
     refreshPresence: function () {
       if (!isTeacher()) return;
       return DataStore.refreshPresence().then(function (list) {
@@ -1463,7 +1472,7 @@
       if (fields.some(function (f) { return !f.value; })) return toast('표의 모든 칸을 채워 주세요');
       if (phase === 'N' && (isTeacher() || tt !== 'solution' || assignedGroups(myGroup()).indexOf(tid) < 0)) return toast('지정된 모둠에만 댓글을 남길 수 있어요.');
       if (phase === 'N' && fields.some(function (f) { return f.value.replace(/\s/g, '').length < 10; })) return toast('각 칸을 공백 제외 10자 이상 작성해 주세요.');
-      if (phase === 'H' && commentsOn(phase, tt, tid).length >= MAX_H_COMMENTS) return toast('이미 이 글에 댓글이 2개 달렸어요');
+      if ((phase === 'H' || phase === 'N') && commentsOn(phase, tt, tid).length >= MAX_H_COMMENTS) return toast('이미 이 글에 댓글이 2개 달렸어요');
       if (phase === 'H' && !isTeacher()) {
         var target = S.d.studentsById[tid], written = S.d.comments.filter(function (c) { return c.phase === 'H' && c.targetType === 'tcard' && c.authorId === me().id; });
         if (!target || target.group !== me().group || tid === me().id || written.some(function (c) { return c.targetId === tid; })) return toast('다른 친구에게 댓글을 하나씩 남겨 주세요.');

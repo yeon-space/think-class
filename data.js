@@ -164,7 +164,7 @@
         var c = classId;
         function save() {
           var db = read(c), all = db.comments || {};
-          if (data.phase === 'H' && Object.keys(all).filter(function (id) { var x = all[id]; return x.phase === 'H' && x.targetType === data.targetType && x.targetId === data.targetId; }).length >= 2) throw commentLimit();
+          if ((data.phase === 'H' || data.phase === 'N') && Object.keys(all).filter(function (id) { var x = all[id]; return x.phase === data.phase && x.targetType === data.targetType && x.targetId === data.targetId; }).length >= 2) throw commentLimit();
           if (data.phase === 'H' && data.targetType === 'tcard' && data.authorId && data.authorGroup) {
             var written = Object.keys(all).map(function (id) { return all[id]; }).filter(function (x) { return x.phase === 'H' && x.targetType === 'tcard' && x.authorId === data.authorId; });
             if (data.authorId === data.targetId || written.some(function (x) { return x.targetId === data.targetId; })) throw duplicateTarget();
@@ -458,6 +458,29 @@
         });
       },
       addComment: function (data) {
+        if (data.phase === 'N' && data.targetType === 'solution') {
+          var groupClass = classId;
+          return ready.then(function () {
+            var comments = colRef('comments', groupClass), group = colRef('groupwork', groupClass).doc(data.targetId), ref = comments.doc();
+            return track(comments.where('targetId', '==', data.targetId).get().then(function (existing) {
+              var legacy = existing.docs.filter(function (s) { var x=s.data(); return x.phase === 'N' && x.targetType === 'solution'; }).map(function (s) { return s.id; });
+              return db.runTransaction(function (tx) {
+                return tx.get(group).then(function (snap) {
+                  if (!snap.exists) throw new Error('댓글을 달 모둠 방안이 없어졌어요.');
+                  var ids = snap.data().nCommentIds;
+                  if (!Array.isArray(ids)) ids = legacy;
+                  return Promise.all(ids.map(function (id) { return tx.get(comments.doc(id)); })).then(function (snaps) {
+                    var live = snaps.filter(function (s) { if (!s.exists) return false; var x=s.data(); return x.phase === 'N' && x.targetType === 'solution' && x.targetId === data.targetId; }).map(function (s) { return s.id; });
+                    if (live.length >= 2) throw commentLimit();
+                    tx.set(group, {nCommentIds:live.concat([ref.id])}, {merge:true});
+                    tx.set(ref, stripId(data));
+                    return ref.id;
+                  });
+                });
+              });
+            }), 'comment/' + groupClass + '/' + data.targetId);
+          });
+        }
         if (data.phase !== 'H' || data.targetType !== 'tcard') return this.addDoc('comments', data);
         var c = classId;
         return ready.then(function () {
